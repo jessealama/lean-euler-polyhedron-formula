@@ -1,0 +1,10 @@
+# Lean build artifacts
+.lake/
+build/
+lake-manifest.json
+
+# Editor files
+.vscode/
+*.swp
+*~
+.DS_Store
