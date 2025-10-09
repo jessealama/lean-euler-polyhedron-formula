@@ -314,13 +314,40 @@ The map extends linearly to the entire chain group by:
 For k ≤ 0, the boundary map is the zero map (source is trivial). -/
 noncomputable def boundaryMap (P : ConvexPolyhedron E) (k : ℤ) :
     P.chainGroup k →ₗ[ZMod 2] P.chainGroup (k - 1) := by
-  sorry
+  by_cases hk : 0 < k
+  · by_cases hk' : 0 ≤ k - 1
+    · -- Both k and k-1 are non-negative, so both index sets are finsets of faces
+      -- For each k-face G, the boundary is the formal sum of incident (k-1)-faces
+      -- This is conceptually straightforward but the full implementation requires
+      -- careful handling of the dependent types and decidable instances.
+      sorry
+    · -- k > 0 but k - 1 < 0: target is trivial, so zero map
+      exact 0
+  · -- k ≤ 0: source is trivial, so zero map
+    exact 0
 
 /-- The boundary of a boundary is zero: ∂² = 0.
 
-This is the key algebraic property that makes the face lattice into a chain complex. -/
+This is the key algebraic property that makes the face lattice into a chain complex.
+
+The proof relies on a fundamental combinatorial fact: each (k-2)-face H appears in
+∂²(G) exactly as many times as there are k-1 faces F containing H that are themselves
+contained in the k-face G. In the boundary of a face, this count is always even
+(it equals the number of ways to choose 2 facets of a simplex-like structure).
+
+Working over ZMod 2, any even count becomes 0, so ∂²(G) = 0 for each k-face G.
+By linearity, ∂² = 0 on the entire chain group. -/
 theorem boundary_comp_boundary (P : ConvexPolyhedron E) (k : ℤ) :
     (P.boundaryMap (k - 1)).comp (P.boundaryMap k) = 0 := by
+  -- Strategy: Show that for any k-face G, (∂ ∘ ∂)(G) = 0
+  -- Each (k-2)-face H appears in ∂(∂(G)) an even number of times (over ZMod 2, this is 0)
+
+  ext x
+  simp [LinearMap.comp_apply]
+
+  -- The composition ∂_{k-1} ∘ ∂_k is the zero map
+  -- This follows from the fact that in the face lattice, each (k-2)-face H is incident
+  -- to an even number of pairs (F, G) where H ⊆ F ⊆ G, F is a (k-1)-face, and G is a k-face
   sorry
 
 -- TODO: Define faceChainComplex (P : ConvexPolyhedron E) : ChainComplex (ZMod 2) ℤ
