@@ -248,6 +248,44 @@ noncomputable def incident (P : ConvexPolyhedron E) (F G : Face P) : Bool :=
   -- Check if F is a proper face of G with dimension exactly one less
   (F.dim + 1 == G.dim) && @decide (F.toSet ⊆ G.toSet) (Classical.dec _)
 
+/-- Incidence is true iff the dimension condition holds and F ⊆ G -/
+theorem incident_iff (P : ConvexPolyhedron E) (F G : Face P) :
+    P.incident F G ↔ (F.dim + 1 = G.dim ∧ F.toSet ⊆ G.toSet) := by
+  unfold incident
+  simp only [Bool.and_eq_true, beq_iff_eq]
+  constructor
+  · intro ⟨h1, h2⟩
+    exact ⟨h1, @of_decide_eq_true (F.toSet ⊆ G.toSet) (Classical.dec _) h2⟩
+  · intro ⟨h1, h2⟩
+    exact ⟨h1, @decide_eq_true (F.toSet ⊆ G.toSet) (Classical.dec _) h2⟩
+
+/-- If F is incident to G, then F ⊆ G -/
+theorem incident_subset (P : ConvexPolyhedron E) {F G : Face P} (h : P.incident F G) :
+    F.toSet ⊆ G.toSet := by
+  rw [incident_iff] at h
+  exact h.2
+
+/-- If F is incident to G, then dim F = dim G - 1 -/
+theorem incident_dim (P : ConvexPolyhedron E) {F G : Face P} (h : P.incident F G) :
+    F.dim + 1 = G.dim := by
+  rw [incident_iff] at h
+  exact h.1
+
+/-- Incidence is irreflexive: a face is not incident to itself -/
+theorem incident_irrefl (P : ConvexPolyhedron E) (F : Face P) :
+    ¬P.incident F F := by
+  intro h
+  have := incident_dim P h
+  omega
+
+/-- Incidence is asymmetric: if F is incident to G, then G is not incident to F -/
+theorem incident_asymm (P : ConvexPolyhedron E) {F G : Face P}
+    (h : P.incident F G) : ¬P.incident G F := by
+  intro h'
+  have hFG := incident_dim P h
+  have hGF := incident_dim P h'
+  omega
+
 /-- The k-dimensional faces form a finite set (key theorem).
 
 ## Proof Strategy
