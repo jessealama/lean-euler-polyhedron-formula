@@ -386,10 +386,55 @@ noncomputable def boundaryMap (P : ConvexPolyhedron E) (k : ℤ) :
   -- In those cases, we can just return the zero map
   by_cases hk : 0 < k
   · by_cases hk' : 0 ≤ k - 1
-    · -- Both k and k-1 are non-negative
-      -- For now, use the zero map until we complete the full implementation
-      -- TODO: Implement the proper boundary map following Polyhedron.lean pattern
-      sorry
+    · -- Both k and k-1 are non-negative, so we can define the proper boundary map
+      have hk_nonneg : 0 ≤ k := le_of_lt hk
+      -- Simplify facesIndexSet to the actual face subtype
+      have idx_k : P.facesIndexSet k = { F : Face P // F.dim = k } := by
+        simp [facesIndexSet, hk_nonneg]
+      have idx_k1 : P.facesIndexSet (k - 1) = { F : Face P // F.dim = k - 1 } := by
+        simp only [facesIndexSet]; split_ifs; rfl
+      -- Build the linear map following Polyhedron.lean pattern
+      refine {
+        toFun := fun chain => fun g =>
+          -- For each (k-1)-face g, sum over all k-faces F that are incident to g
+          -- We use the simplified incidence relation P.incident
+          Finset.univ.sum fun F : P.facesIndexSet k =>
+            if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then chain F else 0
+        map_add' := ?_
+        map_smul' := ?_
+      }
+      · -- Prove map_add': ∂(x + y) = ∂x + ∂y
+        intro x y
+        funext g
+        dsimp only
+        -- The sum distributes over addition
+        have h : ∀ F : P.facesIndexSet k,
+          (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then (x + y) F else 0) =
+          (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then x F else 0) +
+          (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then y F else 0) := by
+          intro F
+          split_ifs
+          · rfl
+          · simp
+        simp_rw [h]
+        rw [Finset.sum_add_distrib]
+        rfl
+      · -- Prove map_smul': ∂(r • x) = r • ∂x
+        intro r x
+        funext g
+        dsimp only
+        simp only [RingHom.id_apply]
+        -- Scalar multiplication distributes through the sum
+        have h : ∀ F : P.facesIndexSet k,
+          (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then (r • x) F else 0) =
+          r • (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then x F else 0) := by
+          intro F
+          split_ifs
+          · rfl
+          · simp
+        simp_rw [h]
+        rw [← Finset.smul_sum]
+        rfl
     · -- k > 0 but k - 1 < 0: zero map (target is trivial)
       exact 0
   · -- k ≤ 0: zero map (source is trivial)
