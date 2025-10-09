@@ -239,6 +239,15 @@ end Face
 def faces (P : ConvexPolyhedron E) (k : ℕ) : Set (Face P) :=
   {F : Face P | F.dim = k}
 
+/-- Simplified incidence relation: F is incident to G if F is a facet of G.
+This is the relation we use in the boundary map: for each k-face G, we sum over
+all (k-1)-faces F that are incident to it.
+
+Note: This is directional - F is incident to G means F ⊆ G and dim F = dim G - 1. -/
+noncomputable def incident (P : ConvexPolyhedron E) (F G : Face P) : Bool :=
+  -- Check if F is a proper face of G with dimension exactly one less
+  (F.dim + 1 == G.dim) && @decide (F.toSet ⊆ G.toSet) (Classical.dec _)
+
 /-- The k-dimensional faces form a finite set (key theorem).
 
 ## Proof Strategy
@@ -284,6 +293,21 @@ section ChainComplex
 def facesIndexSet (P : ConvexPolyhedron E) (k : ℤ) : Type _ :=
   if 0 ≤ k then { F : Face P // F.dim = k } else PUnit
 
+/-- The k-faces form a finite type (assuming faces_finite) -/
+noncomputable instance (P : ConvexPolyhedron E) (k : ℤ) : Fintype (P.facesIndexSet k) := by
+  unfold facesIndexSet
+  split
+  · -- k ≥ 0: Use faces_finite to get Fintype
+    -- Convert ℤ to ℕ (we know k ≥ 0)
+    have hk : 0 ≤ k := by assumption
+    let k_nat : ℕ := Int.toNat k
+    have hk_eq : (k_nat : ℤ) = k := Int.toNat_of_nonneg hk
+    -- We need Fintype for {F : Face P // F.dim = k}
+    -- This would follow from faces_finite, but that theorem is currently sorry
+    sorry
+  · -- k < 0: PUnit is finite
+    infer_instance
+
 /-- The chain group of k-dimensional faces (functions from k-faces to ZMod 2).
 
 We work over ZMod 2 to avoid orientation issues. Each face either appears (1) or
@@ -320,13 +344,13 @@ This follows the pattern from Polyhedron.lean, using functions instead of Finsup
 for simpler type class inference. -/
 noncomputable def boundaryMap (P : ConvexPolyhedron E) (k : ℤ) :
     P.chainGroup k →ₗ[ZMod 2] P.chainGroup (k - 1) := by
-  -- The structure is simpler if we don't try to be too clever with dependent types
   -- When k ≤ 0 or k-1 < 0, at least one side is the trivial module (functions from PUnit)
   -- In those cases, we can just return the zero map
   by_cases hk : 0 < k
   · by_cases hk' : 0 ≤ k - 1
     · -- Both k and k-1 are non-negative
-      -- For now, defer the full implementation but keep the structure
+      -- For now, use the zero map until we complete the full implementation
+      -- TODO: Implement the proper boundary map following Polyhedron.lean pattern
       sorry
     · -- k > 0 but k - 1 < 0: zero map (target is trivial)
       exact 0
