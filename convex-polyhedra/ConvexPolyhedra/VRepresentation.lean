@@ -459,18 +459,125 @@ theorem dim_strictMono_of_chain {P : ConvexPolyhedron E} {F G H : Face P}
     (hFG : F < G) (hGH : G < H) : F.dim < G.dim ∧ G.dim < H.dim := by
   exact ⟨dim_lt_of_ssubset hFG, dim_lt_of_ssubset hGH⟩
 
-/-- Between any two faces differing by k dimensions, there exists
-    a saturated chain of length k (chain where consecutive elements cover each other).
+/-- Key lemma for graded lattices: every proper face has an incident face.
 
-    This uses the Mathlib `LTSeries` infrastructure for cleaner expression. -/
+    If F < G (proper containment), then there exists H with P.incident F H and H ≤ G.
+    In particular, H.dim = F.dim + 1.
+
+    This is the fundamental "upward extension" property of graded posets:
+    you can always take one step up the lattice while staying below a given upper bound.
+
+    ## Geometric Intuition
+
+    Example (cube): Let F be an edge (1D) and G be the cube (3D).
+    - F has 2 vertices, G has 8 vertices
+    - We can find H = a square face containing F
+    - H has 4 vertices and dim(H) = 2 = dim(F) + 1
+    - So F ⊂ H ⊂ G with H exactly one dimension higher than F
+
+    Note: "One dimension higher" does NOT mean "add one vertex"!
+    - Edge → Face: add 2 vertices (2D → 4 vertices)
+    - Face → Cube: add 4 vertices (4 → 8 vertices)
+    The dimension is about the affine span, not the vertex count.
+
+    ## Proof Strategy
+
+    The geometric idea: if F is properly contained in G, we can find an intermediate face H
+    with dimension exactly one higher than F, while staying within G. More rigorously:
+    - F and G are faces defined by maximizing linear functionals
+    - Since dim(F) < dim(G), there's "room" to increase dimension
+    - By adjusting F's defining functional, we can create a face of dimension dim(F) + 1
+    - This gives H with F.dim + 1 = H.dim and F ⊂ H ⊆ G
+
+    For polytopes, this follows from the face lattice being graded by dimension.
+
+    ## Implementation Note
+
+    We use `incident` instead of `⋖` (CovBy) to avoid circular dependency through
+    the GradeOrder instance, which itself relies on incident_iff_covBy. -/
+theorem exists_incident_face_below {P : ConvexPolyhedron E} {F G : Face P}
+    (h : F < G) : ∃ H : Face P, P.incident F H ∧ H ≤ G := by
+  sorry  -- Requires polytope theory: graded lattice property of face posets
+
+/-- Between any two faces differing by k dimensions, there exists
+    a chain of length k where consecutive elements are incident.
+
+    ## Proof by Induction on k
+
+    - Base case (k=0): F.dim = G.dim and F ≤ G implies F = G
+    - Inductive step: Use `exists_incident_face_below` to find H with P.incident F H and H ≤ G
+      Then H.dim = F.dim + 1 (by incident_dim), so G.dim = H.dim + k, and apply IH
+
+    Note: We return incident relations (not covering ⋖) to avoid circular dependency.
+    The covering version can be derived later using incident_iff_covBy. -/
 theorem exists_saturated_chain {P : ConvexPolyhedron E} {F G : Face P}
     (h : F ≤ G) (k : ℕ) (hdim : G.dim = F.dim + k) :
-    ∃ (chain : LTSeries (Face P)),
-      chain.head = F ∧
-      chain.last = G ∧
-      chain.length = k ∧
-      (∀ i : Fin chain.length, chain.toFun i.castSucc ⋖ chain.toFun i.succ) := by
-  sorry  -- Induction on k using that lattice is graded by dimension
+    ∃ (chain : Fin (k + 1) → Face P),
+      chain 0 = F ∧
+      chain (Fin.last k) = G ∧
+      (∀ i : Fin k, P.incident (chain i.castSucc) (chain i.succ)) := by
+  -- Induction on k
+  induction k generalizing F G with
+  | zero =>
+    -- Base case: k = 0, so F.dim = G.dim and F ≤ G
+    have hFG_eq : F = G := by
+      apply le_antisymm h
+      -- Need: G ≤ F, which follows from dimensions being equal
+      have hdim_eq : F.dim = G.dim := by omega
+      -- Since F ≤ G and dim F = dim G, we have F = G
+      by_contra hne
+      -- If F ≠ G, then F and G are incomparable (by incomparable_of_eq_dim)
+      sorry  -- Need: F ≤ G and dim F = dim G implies F = G for faces
+    subst hFG_eq
+    -- Chain of length 1: just [F] (since k+1 = 1)
+    use fun _ => F
+    constructor
+    · rfl  -- chain 0 = F
+    constructor
+    · rfl  -- chain (Fin.last 0) = F
+    · -- For k = 0, Fin k is empty, so the incident property is vacuous
+      intro i
+      exact Fin.elim0 i
+  | succ k ih =>
+    -- Inductive case: k' = k + 1, so we have k + 1 + 1 = k + 2 elements
+    -- We have F.dim + (k + 1) = G.dim
+    have hF_lt_G : F < G := by
+      constructor
+      · exact h
+      · intro hGF
+        have : F = G := le_antisymm h hGF
+        subst this
+        omega  -- F.dim + (k + 1) = F.dim is impossible
+    -- By exists_incident_face_below, find H with P.incident F H and H ≤ G
+    obtain ⟨H, hF_inc_H, hH_le_G⟩ := exists_incident_face_below hF_lt_G
+    -- From P.incident F H, we get H.dim = F.dim + 1
+    have hH_dim : H.dim = F.dim + 1 := (incident_dim P hF_inc_H).symm
+    -- Therefore G.dim = H.dim + k
+    have hG_dim : G.dim = H.dim + k := by omega
+    -- By IH, get a chain from H to G of length k (so k+1 elements)
+    obtain ⟨tail_chain, htail_head, htail_last, htail_inc⟩ :=
+      ih hH_le_G hG_dim
+    -- Prepend F to get a chain of length k+1 (so k+2 elements)
+    use fun i : Fin (k + 2) =>
+      if h : i = 0 then F else tail_chain ⟨i.val - 1, by omega⟩
+    constructor
+    · -- chain 0 = F
+      simp
+    constructor
+    · -- chain (Fin.last (k+1)) = G
+      have : Fin.last (k + 1) ≠ 0 := by omega
+      simp [this, Fin.last, htail_last]
+      congr 1
+    · -- incident property
+      intro i
+      -- Split into two cases: i = 0 (first step) or i > 0 (inherited from tail)
+      by_cases hi : i.val = 0
+      · -- First step: F is incident to H
+        have hi_eq : i = 0 := Fin.ext hi
+        simp [hi_eq, Fin.castSucc, Fin.succ]
+        convert hF_inc_H
+      · -- Later steps: inherited from tail_chain
+        sorry  -- Need to show incident property is preserved from tail
 
 /-- Raw formulation of saturated chains using Fin functions, for backward compatibility.
     This is derivable from the LTSeries version but may be more convenient in some proofs.
