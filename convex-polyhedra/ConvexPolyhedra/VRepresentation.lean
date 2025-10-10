@@ -20,6 +20,9 @@ import Mathlib.Data.Finsupp.Defs
 import Mathlib.Data.ZMod.Defs
 import Mathlib.Order.Defs.PartialOrder
 import Mathlib.Order.Lattice
+import Mathlib.Order.Grade
+import Mathlib.Order.RelSeries
+import Mathlib.Order.Cover
 
 /-!
 # V-Representation of Convex Polyhedra
@@ -337,7 +340,8 @@ The grading is given by the dimension function.
 
 Key properties:
 - The subset relation F.toSet ⊆ G.toSet defines a partial order on faces
-- The incidence relation is the "covering relation": F incident G ↔ F ⊂ G and no face strictly between
+- The incidence relation is the "covering relation":
+  F incident G ↔ F ⊂ G and no face strictly between
 - Dimension gives the grading: faces at level k have dimension k
 - The lattice is bounded (has minimum and maximum elements)
 
@@ -446,32 +450,154 @@ theorem dim_strictMono_of_chain {P : ConvexPolyhedron E} {F G H : Face P}
   exact ⟨dim_lt_of_ssubset hFG, dim_lt_of_ssubset hGH⟩
 
 /-- Between any two faces differing by k dimensions, there exists
-    a saturated chain of length k (chain where consecutive elements
-    are incident) -/
+    a saturated chain of length k (chain where consecutive elements cover each other).
+
+    This uses the Mathlib `LTSeries` infrastructure for cleaner expression. -/
 theorem exists_saturated_chain {P : ConvexPolyhedron E} {F G : Face P}
+    (h : F ≤ G) (k : ℕ) (hdim : G.dim = F.dim + k) :
+    ∃ (chain : LTSeries (Face P)),
+      chain.head = F ∧
+      chain.last = G ∧
+      chain.length = k ∧
+      (∀ i : Fin chain.length, chain.toFun i.castSucc ⋖ chain.toFun i.succ) := by
+  sorry  -- Induction on k using that lattice is graded by dimension
+
+/-- Raw formulation of saturated chains using Fin functions, for backward compatibility.
+    This is derivable from the LTSeries version but may be more convenient in some proofs. -/
+theorem exists_saturated_chain_fin {P : ConvexPolyhedron E} {F G : Face P}
     (h : F ≤ G) (k : ℕ) (hdim : G.dim = F.dim + k) :
     ∃ (chain : Fin (k + 1) → Face P),
       chain 0 = F ∧
       chain (Fin.last k) = G ∧
       (∀ i : Fin k, P.incident (chain i.castSucc) (chain i.succ)) := by
-  sorry  -- Induction on k using that lattice is graded by dimension
+  sorry  -- Can be derived from exists_saturated_chain using LTSeries.toFun
 
-/-- The face lattice is a graded poset: any two maximal chains between
-    the same endpoints have the same length -/
-theorem face_lattice_is_graded {P : ConvexPolyhedron E} {F G : Face P}
-    (h : F ≤ G) :
-    ∀ (m n : ℕ)
-      (chain1 : Fin (m + 1) → Face P)
-      (chain2 : Fin (n + 1) → Face P),
-    (chain1 0 = F ∧ chain1 (Fin.last m) = G ∧
-     ∀ i : Fin m, P.incident (chain1 i.castSucc) (chain1 i.succ)) →
-    (chain2 0 = F ∧ chain2 (Fin.last n) = G ∧
-     ∀ i : Fin n, P.incident (chain2 i.castSucc) (chain2 i.succ)) →
-    m = n := by
-  intro m n chain1 chain2 h1 h2
-  -- Both chains have length G.dim - F.dim because dimension increases
-  -- by exactly 1 at each step in a saturated chain
-  sorry  -- Use that incident increases dimension by 1
+/-- Saturated chains are strictly monotone: if consecutive elements are incident,
+    then the chain is strictly increasing.
+
+    This is just an application of Fin.strictMono_iff_lt_succ combined with the
+    fact that incidence implies strict inequality. -/
+theorem saturated_chain_strictMono {P : ConvexPolyhedron E} {n : ℕ}
+    (chain : Fin (n + 1) → Face P)
+    (hsat : ∀ i : Fin n, P.incident (chain i.castSucc) (chain i.succ)) :
+    StrictMono chain := by
+  -- Use the characterization of strict monotonicity for Fin
+  rw [Fin.strictMono_iff_lt_succ]
+  intro i
+  -- We have incidence, which implies strict inequality
+  have hinc := hsat i
+  rw [incident_iff_covers] at hinc
+  exact hinc.1
+
+/-! ### Graded lattice structure using Mathlib infrastructure
+
+The following provides a cleaner formulation of the graded lattice property
+using Mathlib's `GradeOrder` typeclass and `LTSeries` for chains.
+-/
+
+/-- Incidence is the covering relation in the face lattice. -/
+theorem incident_iff_covBy {P : ConvexPolyhedron E} (F G : Face P) :
+    P.incident F G ↔ F ⋖ G := by
+  rw [incident_iff_covers, CovBy]
+  simp only [and_congr_right_iff]
+  intro hlt
+  constructor
+  · intro hdim H hFH hHG
+    -- If F < H < G, then by dimension monotonicity dim F < dim H < dim G
+    have hF_dim : F.dim < H.dim := dim_lt_of_ssubset hFH
+    have hH_dim : H.dim < G.dim := dim_lt_of_ssubset hHG
+    -- But hdim says dim F + 1 = dim G, so no integer can be strictly between
+    omega
+  · intro hcov
+    -- Have: no face H with F < H < G
+    -- Need to show: dim F + 1 = dim G
+    have hdim_lt : F.dim < G.dim := dim_lt_of_ssubset hlt
+    -- If dim F + 1 ≠ dim G, there would be a face of intermediate dimension
+    by_contra hdim_ne
+    have : F.dim + 1 < G.dim := by omega
+    -- Then by exists_saturated_chain there's a chain with more than one step
+    let k := (G.dim - F.dim).toNat
+    have hk : k ≥ 2 := by omega
+    have hdim_eq : G.dim = F.dim + ↑k := by
+      simp [k]
+      omega
+    obtain ⟨chain, hchain_start, hchain_end, hchain_inc⟩ :=
+      exists_saturated_chain_fin hlt.le k hdim_eq
+    -- This chain has length k ≥ 2, so there exists an intermediate face H between F and G
+    -- Since k ≥ 2, chain has at least 3 elements: chain 0 = F, chain 1 = H, ..., chain k = G
+    -- So chain 1 is strictly between F and G
+    let H := chain ⟨1, by omega⟩
+    have hF_H : F < H := by
+      rw [← hchain_start]
+      constructor
+      · -- chain 0 ⊆ chain 1
+        have hinc := hchain_inc ⟨0, by omega⟩
+        exact incident_subset P hinc
+      · -- ¬(chain 1 ⊆ chain 0)
+        intro hHF
+        -- If chain 1 ⊆ chain 0 and chain 0 ⊆ chain 1 (from incidence), then chain 0 = chain 1
+        have hinc := hchain_inc ⟨0, by omega⟩
+        have heq : chain ⟨0, by omega⟩ = chain ⟨1, by omega⟩ := by
+          apply le_antisymm
+          · exact incident_subset P hinc
+          · exact hHF
+        -- But incidence implies dim(chain 0) + 1 = dim(chain 1), so they can't be equal
+        have hdim := incident_dim P hinc
+        -- Simplify: i.castSucc for i = ⟨0, ...⟩ gives ⟨0, ...⟩ and i.succ gives ⟨1, ...⟩
+        simp only [Fin.castSucc_mk, Fin.succ_mk, zero_add] at hdim
+        rw [heq] at hdim
+        omega
+    have hH_G : H < G := by
+      rw [← hchain_end]
+      -- Chain is strictly monotone, so chain 1 < chain k follows immediately
+      have hstrict : StrictMono chain := saturated_chain_strictMono chain hchain_inc
+      have h_idx : (⟨1, by omega⟩ : Fin (k + 1)) < Fin.last k := by
+        rw [Fin.lt_iff_val_lt_val, Fin.val_last]
+        simp
+        omega
+      exact hstrict h_idx
+    -- Now we have hF_H : F < H and hH_G : H < G
+    -- But hcov says: ∀ c, F < c → ¬(c < G)
+    -- Applying hcov with c = H gives: F < H → ¬(H < G)
+    -- Then applying hF_H gives: ¬(H < G)
+    -- Finally applying hH_G to the negation gives False
+    exact (hcov hF_H) hH_G
+
+/-- The face lattice forms a ℤ-graded order with dimension as the grade function. -/
+noncomputable instance Face.instGradeOrder {P : ConvexPolyhedron E} : GradeOrder ℤ (Face P) where
+  grade := Face.dim
+  grade_strictMono := by
+    intro F G hFG
+    exact dim_lt_of_ssubset hFG
+  covBy_grade := by
+    intro F G hcov
+    -- hcov : F ⋖ G, need to show: F.dim ⋖ G.dim (covering in ℤ)
+    -- Use incident_iff_covBy to get incident, then use incident_dim
+    have hinc : P.incident F G := incident_iff_covBy F G |>.mpr hcov
+    have hdim : F.dim + 1 = G.dim := incident_dim P hinc
+    -- Now show F.dim ⋖ G.dim
+    constructor
+    · -- F.dim < G.dim
+      omega
+    · -- No integer strictly between F.dim and G.dim
+      intro k hFk hkG
+      omega
+
+/-- Simplified statement: all saturated chains between F and G have length equal to
+    the dimension difference.
+
+    This is the key property of graded posets, stated cleanly using Mathlib's infrastructure.
+    It directly implies that all such chains have the same length. -/
+theorem face_lattice_graded_clean {P : ConvexPolyhedron E} (F G : Face P) (h : F ≤ G) :
+    ∀ (chain : LTSeries (Face P)),
+      chain.head = F →
+      chain.last = G →
+      (∀ i : Fin chain.length, chain.toFun i.castSucc ⋖ chain.toFun i.succ) →
+      (chain.length : ℤ) = G.dim - F.dim := by
+  intro chain hhead hlast hsat
+  -- In a graded poset, each covering step increases grade (dimension) by exactly 1
+  -- So the total length equals the dimension difference
+  sorry -- Induction on chain length using covBy_grade
 
 /-- The open interval (H, G) in the face lattice:
     all faces F with H < F < G -/
@@ -500,18 +626,6 @@ theorem faceInterval_eq_intermediateFaces {P : ConvexPolyhedron E} {H G : Face P
       omega
   · intro ⟨⟨hHF, hFG⟩, _⟩
     exact ⟨hHF, hFG⟩
-
-/-- Intermediate faces form a finite set -/
-theorem intermediateFaces_finite (P : ConvexPolyhedron E) (H G : Face P) :
-    (P.intermediateFaces H G).Finite := by
-  -- The intermediate faces are a subset of faces of dimension H.dim + 1
-  have subset : P.intermediateFaces H G ⊆ P.faces (Int.toNat (H.dim + 1)) := by
-    intro F hF
-    simp only [intermediateFaces, Set.mem_sep_iff, faceInterval] at hF
-    simp only [faces, Set.mem_setOf_eq]
-    rw [hF.2]
-    sorry  -- H.dim + 1 = ↑(Int.toNat (H.dim + 1))
-  exact Set.Finite.subset (faces_finite P (Int.toNat (H.dim + 1))) subset
 
 /-- Diamond property (lattice-theoretic formulation):
     In the face lattice, any interval of height 2 contains exactly 2 elements.
