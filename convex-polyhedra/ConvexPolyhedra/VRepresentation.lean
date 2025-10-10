@@ -463,14 +463,21 @@ theorem exists_saturated_chain {P : ConvexPolyhedron E} {F G : Face P}
   sorry  -- Induction on k using that lattice is graded by dimension
 
 /-- Raw formulation of saturated chains using Fin functions, for backward compatibility.
-    This is derivable from the LTSeries version but may be more convenient in some proofs. -/
+    This is derivable from the LTSeries version but may be more convenient in some proofs.
+
+    TODO: Complete this proof after proving exists_saturated_chain and incident_iff_covBy.
+    The proof requires:
+    1. exists_saturated_chain (currently sorry) - uses induction on k with graded lattice structure
+    2. incident_iff_covBy (defined later in file) - proves incidence is the covering relation
+
+    Current blocker: Circular dependency - incident_iff_covBy uses this theorem in its proof. -/
 theorem exists_saturated_chain_fin {P : ConvexPolyhedron E} {F G : Face P}
     (h : F ≤ G) (k : ℕ) (hdim : G.dim = F.dim + k) :
     ∃ (chain : Fin (k + 1) → Face P),
       chain 0 = F ∧
       chain (Fin.last k) = G ∧
       (∀ i : Fin k, P.incident (chain i.castSucc) (chain i.succ)) := by
-  sorry  -- Can be derived from exists_saturated_chain using LTSeries.toFun
+  sorry  -- Will be completed after exists_saturated_chain and resolving circular dependency
 
 /-- Saturated chains are strictly monotone: if consecutive elements are incident,
     then the chain is strictly increasing.
@@ -830,7 +837,7 @@ lemma ZMod.two_ext_iff {a b : ZMod 2} : a = b ↔ a.val = b.val := by
 lemma ZMod.two_ext {a b : ZMod 2} (h : a.val = b.val) : a = b :=
   ZMod.two_ext_iff.mpr h
 
-/-- If a function from a finite type to ZMod 2 is nonzero, then there exists
+/-- If a function from a finite type to ZMod 2 is nonzero, then there exist
 a witness where the function evaluates to a nonzero value.
 
 This is used to extract a specific face from the assumption that a chain complex
