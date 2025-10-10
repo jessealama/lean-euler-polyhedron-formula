@@ -594,7 +594,130 @@ theorem exists_vertex_not_in_affineSpan {P : ConvexPolyhedron E} {F G : Face P}
 there exists a face H containing F and v with dimension exactly dim F + 1.
 
 This is the construction step: given F and a new vertex v, we can build
-a face H = F ∪ {v} with the right dimension. -/
+a face H = F ∪ {v} with the right dimension.
+
+## Proof Strategy
+
+The construction combines exposed face theory with dimension control via three main steps:
+
+### Step 1: Separate v from affineSpan(F.vertices)
+
+Since v ∉ affineSpan(F.vertices), use the geometric Hahn-Banach separation theorem
+to construct a continuous linear functional f₀ : E →L[ℝ] ℝ such that:
+  f₀(v) > sup{f₀(w) | w ∈ affineSpan(F.vertices)}
+
+**Mathlib infrastructure needed**:
+- `Analysis.NormedSpace.HahnBanach.Separation.geometric_hahn_banach_point_point`
+  or `separate_convex_open_set` for strict separation
+- May need custom lemma: `exists_separating_functional_affineSpan` that adapts
+  these results specifically for affine subspaces
+
+### Step 2: Construct H as an exposed face
+
+Define H as the face of P determined by functional f, where vertices maximizing f
+should be exactly F.vertices ∪ {v}:
+
+```lean
+H : Face P := {
+  support := f (normalized appropriately)
+  vertices := {w ∈ P.vertices | f maximizes at w}
+  subset := ... (from P.vertices)
+  is_maximal := ... (verification that f achieves max exactly at these vertices)
+}
+```
+
+**Key challenges**:
+1. Ensuring f maximizes on exactly F.vertices ∪ {v}, not other vertices of G
+2. The Face structure couples functional with vertices - must construct both together
+3. Proving v ∈ H.vertices requires showing f(v) ≥ f(w) for all w ∈ P.vertices
+
+**Mathlib infrastructure needed**:
+- `Analysis.Convex.Exposed.ContinuousLinearMap.toExposed` - construct exposed face
+  from functional
+- `Analysis.Convex.Exposed.IsExposed` - theory of exposed faces
+- May need lemma: `face_of_functional_on_polytope` showing that the max-set of
+  a linear functional on a polytope forms a face
+
+### Step 3: Verify dimension increases by exactly 1
+
+The geometric fact: adding a point outside an affine span increases dimension by 1:
+
+```lean
+affineDim(convexHull(F.vertices ∪ {v})) = affineDim(convexHull(F.vertices)) + 1
+```
+
+**Proof approach**:
+- Use that v ∉ affineSpan(F.vertices) implies v is affinely independent from F.vertices
+- Dimension of affine span is determined by affine independence
+- Show affineSpan(F.vertices ∪ {v}) has direction space one dimension larger
+
+**Mathlib infrastructure needed**:
+- `LinearAlgebra.AffineSpace.Independent.affineDim` - dimension and affine independence
+- `LinearAlgebra.AffineSpace.FiniteDimensional` - dimension properties
+- May need custom lemma: `affineDim_insert_of_not_mem_affineSpan` stating the
+  dimension increase explicitly
+
+### Alternative Approaches Considered
+
+1. **Convex Hull Method**: Define H directly as convexHull(F.vertices ∪ {v}) ∩ G,
+   then prove it's an exposed face. Simpler but less general.
+
+2. **Lattice Growth**: Use the graded poset structure of the face lattice to find
+   a minimal covering face. More abstract, avoids functional analysis but harder
+   to control dimension.
+
+The exposed face + separation approach was chosen as the most explicit and aligned
+with our Face structure definition.
+
+### Required Helper Lemmas
+
+The proof will require formalizing these three critical lemmas:
+
+```lean
+-- 1. Dimension increases by exactly 1 when adding point outside affine span
+lemma affineDim_insert_of_not_mem_affineSpan {s : Finset E} {v : E}
+    (hv : v ∉ affineSpan ℝ (s : Set E)) :
+    affineDim ℝ (convexHull ℝ (insert v s : Set E)) =
+    affineDim ℝ (convexHull ℝ (s : Set E)) + 1
+
+-- 2. Separation from affine subspace via continuous linear functional
+lemma exists_separating_functional_affineSpan {s : Finset E} {v : E}
+    (hv : v ∉ affineSpan ℝ (s : Set E)) :
+    ∃ f : E →L[ℝ] ℝ, f v > ⨆ w ∈ (s : Set E), f w
+
+-- 3. Max-set of linear functional on polytope forms an exposed face
+lemma exposed_face_of_maximizing_functional (P : ConvexPolyhedron E) (f : E →L[ℝ] ℝ)
+    (T : Finset E) (hT : T ⊆ P.vertices) :
+    IsExposed ℝ (P : Set E) {x ∈ P | ∀ y ∈ P, f y ≤ f x} →
+    ∃ H : Face P, H.vertices = T ∧ (∀ w ∈ T, f w ≥ f v for all v ∈ P.vertices)
+```
+
+### Known Complications
+
+1. **Vertex Selection**: The functional must maximize on exactly the right vertices.
+   If other vertices of G also maximize f, dimension could increase by more than 1.
+   Solution: Carefully tune f using the separation property and the fact that
+   F.vertices are already in affineSpan(F.vertices).
+
+2. **Constructiveness**: Hahn-Banach in Mathlib uses classical logic. If computational
+   extraction is needed, may require an alternative construction.
+
+3. **Exposed Face Integration**: While Mathlib has `IsExposed`, polytope-specific
+   versions may need additional infrastructure. Check `Analysis.Convex.Polytope`
+   for completeness.
+
+### Implementation Status
+
+Currently: `sorry` - This is a deep result requiring substantial geometric infrastructure.
+
+Next steps:
+1. Formalize the three helper lemmas above
+2. Implement functional construction using Hahn-Banach
+3. Build Face structure from constructed functional
+4. Verify all properties (F < H, H ≤ G, v ∈ H.vertices, dimension)
+
+This theorem is the main blocker for `exists_incident_face_below` and thus for
+the full graded lattice structure of the face poset. -/
 theorem exists_face_extending_by_vertex {P : ConvexPolyhedron E} {F G : Face P}
     (hFG : F < G)
     (v : E) (hv_in_G : v ∈ G.vertices)
@@ -605,7 +728,7 @@ theorem exists_face_extending_by_vertex {P : ConvexPolyhedron E} {F G : Face P}
       v ∈ H.vertices ∧
       affineDim ℝ (convexHull ℝ (H.vertices : Set E)) =
         affineDim ℝ (convexHull ℝ (F.vertices : Set E)) + 1 := by
-  sorry  -- Requires constructing the supporting functional for H
+  sorry  -- See documentation above for complete implementation strategy
 
 /-- Key lemma for graded lattices: every proper face has an incident face.
 
