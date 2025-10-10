@@ -521,13 +521,13 @@ theorem exists_saturated_chain {P : ConvexPolyhedron E} {F G : Face P}
   | zero =>
     -- Base case: k = 0, so F.dim = G.dim and F ≤ G
     have hFG_eq : F = G := by
-      apply le_antisymm h
-      -- Need: G ≤ F, which follows from dimensions being equal
+      -- We have F ≤ G and F.dim = G.dim
+      -- By incomparable_of_eq_dim: if F.dim = G.dim and F ≠ G, then ¬(F ≤ G) ∧ ¬(G ≤ F)
+      -- Since we have F ≤ G, we must have F = G
       have hdim_eq : F.dim = G.dim := by omega
-      -- Since F ≤ G and dim F = dim G, we have F = G
       by_contra hne
-      -- If F ≠ G, then F and G are incomparable (by incomparable_of_eq_dim)
-      sorry  -- Need: F ≤ G and dim F = dim G implies F = G for faces
+      have := incomparable_of_eq_dim hdim_eq hne
+      exact this.1 h
     subst hFG_eq
     -- Chain of length 1: just [F] (since k+1 = 1)
     use fun _ => F
@@ -565,9 +565,18 @@ theorem exists_saturated_chain {P : ConvexPolyhedron E} {F G : Face P}
       simp
     constructor
     · -- chain (Fin.last (k+1)) = G
-      have : Fin.last (k + 1) ≠ 0 := by omega
-      simp [this, Fin.last, htail_last]
-      congr 1
+      -- Fin.last (k+1) has value k+1 in type Fin (k+2)
+      -- We need to show chain (Fin.last (k+1)) = G
+      simp only [Fin.last]
+      -- When i.val = k+1, the condition i = 0 is false
+      have hne : (⟨k + 1, by omega⟩ : Fin (k + 2)) ≠ 0 := by
+        intro h
+        have : (k + 1 : ℕ) = 0 := Fin.val_eq_of_eq h
+        omega
+      simp [hne]
+      -- Now we have: tail_chain ⟨(k + 1) - 1, _⟩ = G
+      -- Since tail_chain (Fin.last k) = G and (k+1) - 1 = k = Fin.last k
+      convert htail_last using 2
     · -- incident property
       intro i
       -- Split into two cases: i = 0 (first step) or i > 0 (inherited from tail)
@@ -577,7 +586,49 @@ theorem exists_saturated_chain {P : ConvexPolyhedron E} {F G : Face P}
         simp [hi_eq, Fin.castSucc, Fin.succ]
         convert hF_inc_H
       · -- Later steps: inherited from tail_chain
-        sorry  -- Need to show incident property is preserved from tail
+        -- For i > 0, we have i.castSucc.val = i.val and i.succ.val = i.val + 1
+        -- chain i.castSucc = tail_chain ⟨i.val - 1, _⟩
+        -- chain i.succ = tail_chain ⟨i.val + 1 - 1, _⟩ = tail_chain ⟨i.val, _⟩
+        -- We need: P.incident (chain i.castSucc) (chain i.succ)
+
+        -- Compute chain at i.castSucc
+        have hcast_ne_zero : i.castSucc ≠ 0 := by
+          intro h
+          have : i.castSucc.val = 0 := Fin.val_eq_of_eq h
+          simp [Fin.castSucc] at this
+          exact hi (Fin.val_eq_of_eq this)
+
+        -- Compute chain at i.succ
+        have hsucc_ne_zero : i.succ ≠ 0 := by
+          intro h
+          have : i.succ.val = 0 := Fin.val_eq_of_eq h
+          simp [Fin.succ] at this
+
+        simp only [hcast_ne_zero, hsucc_ne_zero, ite_false]
+
+        -- Now we need to show the tail_chain indices match up correctly
+        -- We have htail_inc : ∀ j : Fin k, P.incident (tail_chain j.castSucc) (tail_chain j.succ)
+        -- We want to apply this to some j : Fin k
+
+        -- Since i : Fin (k+1), we have i.val < k+1
+        -- Since i.val ≠ 0, we have 0 < i.val, so 1 ≤ i.val
+        -- Therefore i.val - 1 < k
+
+        have hi_bound : i.val - 1 < k := by omega
+        let j : Fin k := ⟨i.val - 1, hi_bound⟩
+
+        -- Show that the indices match
+        have hcast : (⟨i.castSucc.val - 1, by omega⟩ : Fin (k + 1)) = j.castSucc := by
+          ext
+          simp [Fin.castSucc, j]
+
+        have hsucc : (⟨i.succ.val - 1, by omega⟩ : Fin (k + 1)) = j.succ := by
+          ext
+          simp [Fin.succ, j]
+          omega
+
+        rw [hcast, hsucc]
+        exact htail_inc j
 
 /-- Raw formulation of saturated chains using Fin functions, for backward compatibility.
     This is derivable from the LTSeries version but may be more convenient in some proofs.
