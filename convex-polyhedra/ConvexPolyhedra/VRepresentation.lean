@@ -568,8 +568,15 @@ noncomputable instance (P : ConvexPolyhedron E) (k : ℤ) : Fintype (P.facesInde
     let k_nat : ℕ := Int.toNat k
     have hk_eq : (k_nat : ℤ) = k := Int.toNat_of_nonneg hk
     -- We need Fintype for {F : Face P // F.dim = k}
-    -- This would follow from faces_finite, but that theorem is currently sorry
-    sorry
+    -- The set {F | F.dim = k} equals {F | F.dim = (k_nat : ℤ)} by hk_eq
+    -- By faces_finite, {F | F.dim = (k_nat : ℤ)} = P.faces k_nat is finite
+    -- Use Set.Finite.fintype to get the Fintype instance
+    have h_finite : ({F : Face P | F.dim = k} : Set (Face P)).Finite := by
+      have := faces_finite P k_nat
+      convert this
+      ext F
+      simp only [faces, Set.mem_setOf_eq, hk_eq]
+    exact h_finite.fintype
   · -- k < 0: PUnit is finite
     infer_instance
 
@@ -778,10 +785,7 @@ lemma sum_conditional_rearrange {α β γ : Type*} [Fintype α] [Fintype β] [Ad
   rw [← Finset.sum_filter]
   rw [Finset.sum_const]
 
-set_option maxHeartbeats 5000000 in
--- The proof involves nested case analysis and double summations over face lattices
--- which require substantial elaboration time, particularly in the main k≥2 case
--- where we expand the composition of boundary maps and apply the diamond property.
+set_option maxHeartbeats 5000000 in -- nested case analysis and double summations over face lattices
 /-- The boundary of a boundary is zero: ∂² = 0.
 
 This is the key algebraic property that makes the face lattice into a chain complex.
