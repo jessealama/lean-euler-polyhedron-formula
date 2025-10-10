@@ -669,6 +669,187 @@ affineDim(convexHull(F.vertices ∪ {v})) = affineDim(convexHull(F.vertices)) + 
 The exposed face + separation approach was chosen as the most explicit and aligned
 with our Face structure definition.
 
+### Refined Construction Strategy (Most Promising)
+
+After deeper analysis, here's a more concrete geometric construction that directly
+applies Hahn-Banach to build the face H:
+
+**Key Insight**: We don't need H.vertices = F.vertices ∪ {v} exactly. Instead:
+- v ∈ H.vertices (v must be included)
+- F < H (proper containment, so H contains vertices from F)
+- dim(H) = dim(F) + 1 (dimension increases by exactly 1)
+
+#### Construction Steps
+
+**Step 1: Build the target affine subspace**
+
+```lean
+-- The affine span of F.vertices ∪ {v}
+let S : AffineSubspace ℝ E := affineSpan ℝ (insert v (F.vertices : Set E))
+
+-- Key property: v ∉ affineSpan(F.vertices) implies
+have hS_dim : affineDim ℝ S = affineDim ℝ (F.toSet) + 1 :=
+  affineDim_insert_of_not_mem_affineSpan hv_not_in_F
+```
+
+S is the "target" - we want H to be (at least) S ∩ P.
+
+**Step 2: Construct separating functional via Hahn-Banach**
+
+The goal: Build φ : E →L[ℝ] ℝ such that:
+- φ is "constant" on S (or rather, on S.direction)
+- φ separates S from points in P outside S
+- Specifically: φ(w) < sup{φ(x) | x ∈ S} for all w ∈ P \ S
+
+Construction approach:
+```lean
+-- Define a partial linear functional on S.direction that's "constant" (zero)
+let f_partial : S.direction →ₗ[ℝ] ℝ := 0
+
+-- Choose a base point p₀ ∈ S (say, the first vertex in F)
+let p₀ := some vertex from F.vertices
+
+-- Use Hahn-Banach to extend to all of E
+-- The gauge function / sublinear bound controls how φ grows outside S
+obtain ⟨φ_linear : E →ₗ[ℝ] ℝ, extends, bounded⟩ :=
+  exists_extension_of_le_sublinear f_partial gauge_P ...
+
+-- Convert to continuous linear map
+let φ : E →L[ℝ] ℝ := φ_linear.to_continuous_of_bounded ...
+```
+
+**The gauge function**: We need a sublinear map N : E → ℝ such that:
+- N is small/controlled on S.direction (allowing φ to be nearly constant there)
+- N grows appropriately in other directions (ensuring separation)
+
+One approach: Use the gauge of P itself, possibly modified to encode the constraint.
+
+**Step 3: Define H as the exposed face determined by φ**
+
+```lean
+-- H consists of points in P where φ achieves its maximum
+let max_val := ⨆ w ∈ P.vertices, φ(w)
+let H_vertices := {w ∈ P.vertices | φ(w) = max_val}
+
+-- Construct the Face structure
+let H : Face P := {
+  support := φ
+  vertices := H_vertices
+  subset := ...
+  is_maximal := ... -- Verification that φ achieves max exactly at H_vertices
+}
+```
+
+**Step 4: Verify the properties**
+
+Need to show:
+1. v ∈ H.vertices: Since v ∈ S and φ is "constant" on S, φ(v) = max_val
+2. F < H: Some (or all) of F.vertices achieve the maximum, so F.vertices ⊆ H.vertices
+3. H ≤ G: This follows from construction if we ensure φ respects G's structure
+4. dim(H) = dim(F) + 1: Since H contains S ∩ P and φ is constant on S
+
+#### Hahn-Banach Application Details
+
+The precise use of `exists_extension_of_le_sublinear` would be:
+
+```lean
+-- Set up the extension problem in the direction space
+let D := S.direction  -- Subspace of E (vector space, not affine)
+let f : D →ₗ[ℝ] ℝ := 0  -- Constant zero functional on S's direction
+
+-- Define sublinear map (gauge function)
+-- Option 1: Use distance from S
+let N₁ : E → ℝ := λ x ↦ dist x S
+
+-- Option 2: Use gauge of a convex set related to P
+let N₂ : E → ℝ := gauge_function_of P
+
+-- Apply Hahn-Banach
+obtain ⟨g : E →ₗ[ℝ] ℝ, hg_extends, hg_bounded⟩ :=
+  exists_extension_of_le_sublinear f N (N_homogeneous) (N_subadditive) (f_dominated)
+```
+
+**Key verification**:
+- `N_homogeneous`: Prove N(c • x) = c * N(x) for c > 0
+- `N_subadditive`: Prove N(x + y) ≤ N(x) + N(y)
+- `f_dominated`: On D, we have f(x) ≤ N(x) (trivial since f = 0 and N ≥ 0)
+
+The extended functional g then gives us φ after appropriate normalization.
+
+#### Working with Affine vs Linear Structures
+
+Important subtlety: Faces live in affine space, but Hahn-Banach works in vector spaces.
+
+**Bridge via direction spaces**:
+```lean
+-- S is an affine subspace
+-- S.direction is the associated vector subspace
+-- For any p₀ ∈ S, we have S = p₀ +ᵥ S.direction
+
+-- A linear functional φ : E →ₗ[ℝ] ℝ is "constant" on S iff
+-- φ vanishes on S.direction (i.e., φ(v) = 0 for all v ∈ S.direction)
+```
+
+So our strategy is:
+1. Construct φ that vanishes on S.direction (via Hahn-Banach extension of 0)
+2. This makes φ "constant" on the affine subspace S
+3. All points in S ∩ P then achieve the same φ-value
+4. If we normalize so this value is maximal in P, we get our face H
+
+#### Remaining Technical Challenges
+
+1. **Choosing the right gauge function**: Need N that:
+   - Allows φ ≈ 0 on S.direction
+   - Makes φ(w) < 0 for w ∈ P \ S (after appropriate shift)
+   - Ensures the maximum on P is achieved at S ∩ P
+
+2. **Normalization and shifting**: The extended functional g might need:
+   - Normalization: multiply by constant
+   - Shifting: add constant
+   - To ensure max_val occurs at S ∩ P
+
+3. **Proving exactness of dimension**: Need to show:
+   - H contains S ∩ P (at least the vertices in S)
+   - H doesn't contain much more (dimension doesn't exceed dim(S))
+   - This requires careful analysis of which P-vertices achieve the maximum
+
+4. **Connecting to Face structure**: Need to verify:
+   - The vertex set H_vertices satisfies `is_maximal` property
+   - The constructed H actually forms a face (exposed face property)
+
+#### Mathlib Building Blocks to Investigate
+
+For implementation, we'll need:
+
+1. **Gauge functions**:
+   - `Mathlib.Analysis.Convex.Gauge` - gauge of convex sets
+   - Properties: homogeneity, subadditivity
+   - Connection to separation
+
+2. **Affine subspaces and directions**:
+   - `LinearAlgebra.AffineSpace.AffineSubspace` - affine subspace structure
+   - `AffineSubspace.direction` - associated vector subspace
+   - Properties linking affine and linear structures
+
+3. **Extension theorems**:
+   - `Analysis.Convex.Cone.Extension.exists_extension_of_le_sublinear` - main theorem
+   - `Analysis.NormedSpace.HahnBanach.Extension.exists_extension_norm_eq` - variant with norm
+   - Helper lemmas about extension and continuous extensions
+
+4. **Exposed faces in Mathlib**:
+   - `Analysis.Convex.Exposed.IsExposed` - definition
+   - `ContinuousLinearMap.toExposed` - construct exposed face from functional
+   - Properties: closure, compactness, etc.
+
+5. **Polytope-specific theory**:
+   - Check `Analysis.Convex.Polytope` (if it exists) for face constructions
+   - Separation lemmas for polytopes
+   - Vertex and edge properties
+
+This refined strategy provides a much more concrete path from Hahn-Banach to the desired
+face construction. The main work is in setting up the gauge function and proving the
+resulting functional has the right properties.
+
 ### Required Helper Lemmas
 
 The proof will require formalizing these three critical lemmas:
