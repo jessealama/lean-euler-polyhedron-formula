@@ -472,7 +472,42 @@ The geometric intuition: if one face is contained in another, then the vertices
 of the smaller face must be among the vertices of the larger face. -/
 theorem vertices_subset_of_face_subset {P : ConvexPolyhedron E} {F G : Face P}
     (h : F ≤ G) : F.vertices ⊆ G.vertices := by
-  sorry  -- Requires showing extreme points in convex hulls
+  intro v hv
+  -- v ∈ F.vertices, need to show v ∈ G.vertices
+
+  -- v is in F.toSet
+  have hv_in_F : v ∈ F.toSet := by
+    change v ∈ convexHull ℝ (F.vertices : Set E)
+    exact subset_convexHull ℝ _ hv
+
+  -- F.toSet ⊆ G.toSet, so v ∈ G.toSet
+  have hv_in_G : v ∈ G.toSet := h hv_in_F
+
+  -- v ∈ P.vertices (since F.vertices ⊆ P.vertices)
+  have hv_in_P : v ∈ P.vertices := F.subset hv
+
+  -- v is an extreme point of P
+  have hv_extreme : v ∈ P.extremePointsSet := by
+    rw [ConvexPolyhedron.extremePoints_eq_vertices]
+    exact hv_in_P
+
+  -- G.toSet ⊆ P by subset_polyhedron
+  have hG_sub_P : G.toSet ⊆ (P : Set E) := G.subset_polyhedron
+
+  -- Since v ∈ G.toSet and v is extreme in P, v is extreme in G.toSet
+  have hv_extreme_G : v ∈ (G.toSet).extremePoints ℝ := by
+    apply inter_extremePoints_subset_extremePoints_of_subset hG_sub_P
+    exact ⟨hv_in_G, hv_extreme⟩
+
+  -- G.toSet = convexHull (G.vertices), so v is extreme in convexHull (G.vertices)
+  have : G.toSet = convexHull ℝ (G.vertices : Set E) := rfl
+  rw [this] at hv_extreme_G
+
+  -- Extreme points of convexHull S are contained in S
+  have : (convexHull ℝ (G.vertices : Set E)).extremePoints ℝ ⊆ (G.vertices : Set E) :=
+    extremePoints_convexHull_subset
+
+  exact this hv_extreme_G
 
 /-- If F and G are faces with F ⊂ G and dim F < dim G, then there exists
 a vertex v ∈ G.vertices such that v ∉ affineSpan F.vertices.
