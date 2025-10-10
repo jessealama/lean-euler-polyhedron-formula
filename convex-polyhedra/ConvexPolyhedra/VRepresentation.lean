@@ -499,6 +499,47 @@ theorem exists_incident_face_below {P : ConvexPolyhedron E} {F G : Face P}
     (h : F < G) : ∃ H : Face P, P.incident F H ∧ H ≤ G := by
   sorry  -- Requires polytope theory: graded lattice property of face posets
 
+/-! ### Face Lattice Theory Helper Lemmas
+
+These lemmas develop the theory needed to prove `exists_incident_face_below`.
+They show that vertex inclusion is equivalent to face inclusion, and that
+we can construct intermediate faces by adding vertices appropriately. -/
+
+/-- If F ≤ G (F.toSet ⊆ G.toSet), then F.vertices ⊆ G.vertices.
+This connects the partial order on faces to vertex inclusion.
+
+The geometric intuition: if one face is contained in another, then the vertices
+of the smaller face must be among the vertices of the larger face. -/
+theorem vertices_subset_of_face_subset {P : ConvexPolyhedron E} {F G : Face P}
+    (h : F ≤ G) : F.vertices ⊆ G.vertices := by
+  sorry  -- Requires showing extreme points in convex hulls
+
+/-- If F and G are faces with F ⊂ G and dim F < dim G, then there exists
+a vertex v ∈ G.vertices such that v ∉ affineSpan F.vertices.
+
+This is the key step: finding a vertex "outside" F that we can use to extend it. -/
+theorem exists_vertex_not_in_affineSpan {P : ConvexPolyhedron E} {F G : Face P}
+    (hFG : F < G) (hdim : F.dim < G.dim) :
+    ∃ v ∈ G.vertices, v ∉ affineSpan ℝ (F.vertices : Set E) := by
+  sorry  -- Uses affine dimension properties
+
+/-- Given a vertex v in a face G but not in the affine span of face F,
+there exists a face H containing F and v with dimension exactly dim F + 1.
+
+This is the construction step: given F and a new vertex v, we can build
+a face H = F ∪ {v} with the right dimension. -/
+theorem exists_face_extending_by_vertex {P : ConvexPolyhedron E} {F G : Face P}
+    (hFG : F < G)
+    (v : E) (hv_in_G : v ∈ G.vertices)
+    (hv_not_in_F : v ∉ affineSpan ℝ (F.vertices : Set E)) :
+    ∃ H : Face P,
+      F < H ∧
+      H ≤ G ∧
+      v ∈ H.vertices ∧
+      affineDim ℝ (convexHull ℝ (H.vertices : Set E)) =
+        affineDim ℝ (convexHull ℝ (F.vertices : Set E)) + 1 := by
+  sorry  -- Requires constructing the supporting functional for H
+
 /-- Between any two faces differing by k dimensions, there exists
     a chain of length k where consecutive elements are incident.
 
