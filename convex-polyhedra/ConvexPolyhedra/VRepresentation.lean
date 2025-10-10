@@ -459,6 +459,119 @@ theorem dim_strictMono_of_chain {P : ConvexPolyhedron E} {F G H : Face P}
     (hFG : F < G) (hGH : G < H) : F.dim < G.dim ∧ G.dim < H.dim := by
   exact ⟨dim_lt_of_ssubset hFG, dim_lt_of_ssubset hGH⟩
 
+/-! ### Face Lattice Theory Helper Lemmas
+
+These lemmas develop the theory needed to prove `exists_incident_face_below`.
+They show that vertex inclusion is equivalent to face inclusion, and that
+we can construct intermediate faces by adding vertices appropriately. -/
+
+/-- If F ≤ G (F.toSet ⊆ G.toSet), then F.vertices ⊆ G.vertices.
+This connects the partial order on faces to vertex inclusion.
+
+The geometric intuition: if one face is contained in another, then the vertices
+of the smaller face must be among the vertices of the larger face. -/
+theorem vertices_subset_of_face_subset {P : ConvexPolyhedron E} {F G : Face P}
+    (h : F ≤ G) : F.vertices ⊆ G.vertices := by
+  sorry  -- Requires showing extreme points in convex hulls
+
+/-- If F and G are faces with F ⊂ G and dim F < dim G, then there exists
+a vertex v ∈ G.vertices such that v ∉ affineSpan F.vertices.
+
+This is the key step: finding a vertex "outside" F that we can use to extend it. -/
+theorem exists_vertex_not_in_affineSpan {P : ConvexPolyhedron E} {F G : Face P}
+    (hFG : F < G) (hdim : F.dim < G.dim) :
+    ∃ v ∈ G.vertices, v ∉ affineSpan ℝ (F.vertices : Set E) := by
+  -- Strategy: By contradiction, if all vertices of G are in affineSpan F.vertices,
+  -- then affineSpan G.vertices ≤ affineSpan F.vertices.
+  -- But F.toSet = convexHull F.vertices, so affineSpan F.toSet = affineSpan F.vertices.
+  -- Similarly for G. This would give dim G ≤ dim F, contradicting dim F < dim G.
+
+  by_contra h_all_in
+  push_neg at h_all_in
+
+  -- All vertices of G are in affineSpan F.vertices
+  have h_vertices_sub : (G.vertices : Set E) ⊆ (affineSpan ℝ (F.vertices : Set E) : Set E) := by
+    intro v hv
+    exact h_all_in v hv
+
+  -- Therefore affineSpan G.vertices ≤ affineSpan F.vertices
+  have h_span_le : affineSpan ℝ (G.vertices : Set E) ≤ affineSpan ℝ (F.vertices : Set E) := by
+    rw [affineSpan_le]
+    exact h_vertices_sub
+
+  -- Key fact: affineSpan (convexHull s) = affineSpan s
+  have hF_span : affineSpan ℝ F.toSet = affineSpan ℝ (F.vertices : Set E) := by
+    unfold Face.toSet
+    exact affineSpan_convexHull (F.vertices : Set E)
+
+  have hG_span : affineSpan ℝ G.toSet = affineSpan ℝ (G.vertices : Set E) := by
+    unfold Face.toSet
+    exact affineSpan_convexHull (G.vertices : Set E)
+
+  -- Combine: affineSpan G.toSet = affineSpan G.vertices ≤ affineSpan F.vertices = affineSpan F.toSet
+  have h_face_span_le : affineSpan ℝ G.toSet ≤ affineSpan ℝ F.toSet := by
+    rw [hG_span, hF_span]
+    exact h_span_le
+
+  -- By direction monotonicity: (affineSpan G.toSet).direction ≤ (affineSpan F.toSet).direction
+  have h_dir_le : (affineSpan ℝ G.toSet).direction ≤ (affineSpan ℝ F.toSet).direction :=
+    AffineSubspace.direction_le h_face_span_le
+
+  -- By finrank monotonicity: finrank (affineSpan G.toSet).direction ≤ finrank (affineSpan F.toSet).direction
+  -- Note: F.vertices is a Finset, so the affine span direction is finite-dimensional
+  have h_finrank_le : (Module.finrank ℝ (affineSpan ℝ G.toSet).direction : ℤ) ≤
+      (Module.finrank ℝ (affineSpan ℝ F.toSet).direction : ℤ) := by
+    -- Cast ℕ comparison to ℤ
+    have : Module.finrank ℝ (affineSpan ℝ G.toSet).direction ≤
+        Module.finrank ℝ (affineSpan ℝ F.toSet).direction := by
+      -- F.toSet = convexHull F.vertices, and F.vertices is finite
+      -- So affineSpan F.toSet has finite-dimensional direction
+      have hF_finite : (F.vertices : Set E).Finite := F.vertices.finite_toSet
+      have hG_finite : (G.vertices : Set E).Finite := G.vertices.finite_toSet
+      have hF_span : affineSpan ℝ F.toSet = affineSpan ℝ (F.vertices : Set E) :=
+        affineSpan_convexHull (F.vertices : Set E)
+      have hG_span : affineSpan ℝ G.toSet = affineSpan ℝ (G.vertices : Set E) :=
+        affineSpan_convexHull (G.vertices : Set E)
+      -- The direction of affineSpan of a finite set is finite-dimensional
+      haveI : FiniteDimensional ℝ (affineSpan ℝ (F.vertices : Set E)).direction :=
+        finiteDimensional_direction_affineSpan_of_finite ℝ hF_finite
+      -- Rewrite both sides using the span equality
+      rw [hG_span, hF_span]
+      apply Submodule.finrank_mono
+      -- Now h_dir_le needs to be rewritten too
+      rw [hG_span, hF_span] at h_dir_le
+      exact h_dir_le
+    exact Nat.cast_le.mpr this
+
+  -- But G.dim = finrank (affineSpan G.toSet).direction and similarly for F (both as ℤ)
+  have hG_dim_eq : G.dim = (Module.finrank ℝ (affineSpan ℝ G.toSet).direction : ℤ) := rfl
+  have hF_dim_eq : F.dim = (Module.finrank ℝ (affineSpan ℝ F.toSet).direction : ℤ) := rfl
+
+  -- Therefore G.dim ≤ F.dim
+  have h_dim_contradiction : G.dim ≤ F.dim := by
+    rw [hG_dim_eq, hF_dim_eq]
+    exact h_finrank_le
+
+  -- This contradicts our assumption that F.dim < G.dim
+  omega
+
+/-- Given a vertex v in a face G but not in the affine span of face F,
+there exists a face H containing F and v with dimension exactly dim F + 1.
+
+This is the construction step: given F and a new vertex v, we can build
+a face H = F ∪ {v} with the right dimension. -/
+theorem exists_face_extending_by_vertex {P : ConvexPolyhedron E} {F G : Face P}
+    (hFG : F < G)
+    (v : E) (hv_in_G : v ∈ G.vertices)
+    (hv_not_in_F : v ∉ affineSpan ℝ (F.vertices : Set E)) :
+    ∃ H : Face P,
+      F < H ∧
+      H ≤ G ∧
+      v ∈ H.vertices ∧
+      affineDim ℝ (convexHull ℝ (H.vertices : Set E)) =
+        affineDim ℝ (convexHull ℝ (F.vertices : Set E)) + 1 := by
+  sorry  -- Requires constructing the supporting functional for H
+
 /-- Key lemma for graded lattices: every proper face has an incident face.
 
     If F < G (proper containment), then there exists H with P.incident F H and H ≤ G.
@@ -484,10 +597,11 @@ theorem dim_strictMono_of_chain {P : ConvexPolyhedron E} {F G H : Face P}
 
     The geometric idea: if F is properly contained in G, we can find an intermediate face H
     with dimension exactly one higher than F, while staying within G. More rigorously:
-    - F and G are faces defined by maximizing linear functionals
-    - Since dim(F) < dim(G), there's "room" to increase dimension
-    - By adjusting F's defining functional, we can create a face of dimension dim(F) + 1
-    - This gives H with F.dim + 1 = H.dim and F ⊂ H ⊆ G
+
+    1. Since F < G, we have dim F < dim G (by dim_lt_of_ssubset)
+    2. By exists_vertex_not_in_affineSpan: find v ∈ G.vertices \ affineSpan F.vertices
+    3. By exists_face_extending_by_vertex: construct H from F and v with dim H = dim F + 1
+    4. This H satisfies P.incident F H (by construction) and H ≤ G (since H ⊆ G)
 
     For polytopes, this follows from the face lattice being graded by dimension.
 
@@ -497,48 +611,7 @@ theorem dim_strictMono_of_chain {P : ConvexPolyhedron E} {F G H : Face P}
     the GradeOrder instance, which itself relies on incident_iff_covBy. -/
 theorem exists_incident_face_below {P : ConvexPolyhedron E} {F G : Face P}
     (h : F < G) : ∃ H : Face P, P.incident F H ∧ H ≤ G := by
-  sorry  -- Requires polytope theory: graded lattice property of face posets
-
-/-! ### Face Lattice Theory Helper Lemmas
-
-These lemmas develop the theory needed to prove `exists_incident_face_below`.
-They show that vertex inclusion is equivalent to face inclusion, and that
-we can construct intermediate faces by adding vertices appropriately. -/
-
-/-- If F ≤ G (F.toSet ⊆ G.toSet), then F.vertices ⊆ G.vertices.
-This connects the partial order on faces to vertex inclusion.
-
-The geometric intuition: if one face is contained in another, then the vertices
-of the smaller face must be among the vertices of the larger face. -/
-theorem vertices_subset_of_face_subset {P : ConvexPolyhedron E} {F G : Face P}
-    (h : F ≤ G) : F.vertices ⊆ G.vertices := by
-  sorry  -- Requires showing extreme points in convex hulls
-
-/-- If F and G are faces with F ⊂ G and dim F < dim G, then there exists
-a vertex v ∈ G.vertices such that v ∉ affineSpan F.vertices.
-
-This is the key step: finding a vertex "outside" F that we can use to extend it. -/
-theorem exists_vertex_not_in_affineSpan {P : ConvexPolyhedron E} {F G : Face P}
-    (hFG : F < G) (hdim : F.dim < G.dim) :
-    ∃ v ∈ G.vertices, v ∉ affineSpan ℝ (F.vertices : Set E) := by
-  sorry  -- Uses affine dimension properties
-
-/-- Given a vertex v in a face G but not in the affine span of face F,
-there exists a face H containing F and v with dimension exactly dim F + 1.
-
-This is the construction step: given F and a new vertex v, we can build
-a face H = F ∪ {v} with the right dimension. -/
-theorem exists_face_extending_by_vertex {P : ConvexPolyhedron E} {F G : Face P}
-    (hFG : F < G)
-    (v : E) (hv_in_G : v ∈ G.vertices)
-    (hv_not_in_F : v ∉ affineSpan ℝ (F.vertices : Set E)) :
-    ∃ H : Face P,
-      F < H ∧
-      H ≤ G ∧
-      v ∈ H.vertices ∧
-      affineDim ℝ (convexHull ℝ (H.vertices : Set E)) =
-        affineDim ℝ (convexHull ℝ (F.vertices : Set E)) + 1 := by
-  sorry  -- Requires constructing the supporting functional for H
+  sorry  -- Will be proven using the three helper lemmas above
 
 /-- Between any two faces differing by k dimensions, there exists
     a chain of length k where consecutive elements are incident.
