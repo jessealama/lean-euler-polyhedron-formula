@@ -695,6 +695,20 @@ noncomputable def boundaryMap (P : ConvexPolyhedron E) (k : ℤ) :
       rfl
 }
 
+/-- Extensionality for ZMod 2: two values are equal iff they have the same underlying value.
+This is the key principle for reasoning about equality in ZMod 2. -/
+lemma ZMod.two_ext_iff {a b : ZMod 2} : a = b ↔ a.val = b.val := by
+  constructor
+  · intro h; rw [h]
+  · intro h
+    fin_cases a <;> fin_cases b <;> (try rfl) <;> simp_all
+    abel
+
+/-- Extensionality principle for ZMod 2 as an @[ext] theorem. -/
+@[ext]
+lemma ZMod.two_ext {a b : ZMod 2} (h : a.val = b.val) : a = b :=
+  ZMod.two_ext_iff.mpr h
+
 /-- If a function from a finite type to ZMod 2 is nonzero, then there exists
 a witness where the function evaluates to a nonzero value.
 
@@ -708,10 +722,61 @@ lemma function_ne_zero_implies_witness {α : Type*} [Fintype α] (f : α → ZMo
   push_neg at h_all_zero
   -- So f is the zero function
   have h_f_zero : f = 0 := by
-    ext a
+    funext a
     exact h_all_zero a
   -- But this contradicts h_ne
   exact h_ne h_f_zero
+
+/-- Sum rearrangement lemma: swapping nested conditional sums.
+
+This lemma states that a nested sum with conditionals can be rewritten as a sum
+over the outer variable, with each term weighted by the cardinality of the filter.
+
+The pattern is:
+```
+Σ_F [if P1(F) then Σ_G [if P2(F,G) then f(G) else 0] else 0]
+=
+Σ_G [f(G) * card{F | P1(F) ∧ P2(F,G)}]
+```
+
+This is a discrete version of Fubini's theorem for swapping order of summation,
+specialized to the case where we're counting pairs satisfying two predicates. -/
+lemma sum_conditional_rearrange {α β γ : Type*} [Fintype α] [Fintype β] [AddCommMonoid γ]
+    (f : β → γ) (P1 : α → Bool) (P2 : α → β → Bool) :
+    (Finset.univ.sum fun a : α =>
+      if P1 a then
+        Finset.univ.sum fun b : β =>
+          if P2 a b then f b else 0
+      else 0) =
+    (Finset.univ.sum fun b : β =>
+      (Finset.univ.filter fun a : α => P1 a && P2 a b).card • f b) := by
+  -- Step 1: Collapse nested conditionals into a single condition
+  -- if P1 a then (if P2 a b then f b else 0) else 0 = if (P1 a && P2 a b) then f b else 0
+  trans (Finset.univ.sum fun a : α => Finset.univ.sum fun b : β =>
+    if P1 a && P2 a b then f b else 0)
+  · congr 1; ext a
+    by_cases h : P1 a = true
+    · -- Case: P1 a = true
+      simp only [h, ite_true]
+      congr 1
+    · -- Case: P1 a = false
+      have hf : P1 a = false := Bool.eq_false_iff.mpr h
+      simp only [hf]
+      -- Both sides simplify: if false = true then ... = 0
+      simp only [show (false = true) = False by decide, ite_false]
+      -- RHS: ∑ x, if (false && P2 a x) = true then f x else 0 = 0
+      simp only [Bool.false_and, show (false = true) = False by decide, ite_false,
+        Finset.sum_const_zero]
+
+  -- Step 2: Swap the order of summation using Finset.sum_comm
+  rw [Finset.sum_comm]
+
+  -- Step 3: Factor out f b and convert inner sum to cardinality
+  congr 1; ext b
+  -- Now we have: ∑ a, if (P1 a && P2 a b) then f b else 0
+  -- This equals: (card of filter) • f b
+  rw [← Finset.sum_filter]
+  rw [Finset.sum_const]
 
 set_option maxHeartbeats 5000000 in
 -- The proof involves nested case analysis and double summations over face lattices
@@ -795,120 +860,105 @@ theorem boundary_comp_boundary (P : ConvexPolyhedron E) (k : ℤ) :
       -- By diamond property: #{F | g incident F ∧ F incident G} = 2 when g.dim = k-2 and G.dim = k
       -- And 2 = 0 in ZMod 2, so each term is 0
 
-      -- Proof by contradiction using the diamond property
+      -- We'll show the double sum equals zero using the diamond property
+      -- First, handle the type normalization: k - 1 - 1 = k - 2
+      have h_km1m1_eq_km2 : k - 1 - 1 = k - 2 := by omega
 
-      -- We've already applied ext/funext, so we're working with a specific chain
-      -- Assume for contradiction that the double sum for this chain is not identically zero
-      by_contra h_nonzero
+      -- Transport g to the right type for cleaner reasoning
+      have g_km2 : P.facesIndexSet (k - 2) := h_km1m1_eq_km2 ▸ g
 
-      -- Extract a witness (k-2)-face where the double sum is nonzero
-      -- This uses function_ne_zero_implies_witness but the full elaboration is expensive
-      have ⟨g_witness, h_witness⟩ : ∃ g : P.facesIndexSet (k - 2),
-          (Finset.univ.sum fun F_km1 : P.facesIndexSet (k - 1) =>
-            if P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val then
-              Finset.univ.sum fun G_k : P.facesIndexSet k =>
-                if P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val then
-                  chain G_k
+      -- Unfold the composition to get the double sum
+      calc
+        ((P.boundaryMap (k - 1)).comp (P.boundaryMap k)) chain g
+        = (P.boundaryMap (k - 1)).toFun ((P.boundaryMap k).toFun chain) g := rfl
+        _ = (P.boundaryMap (k - 1)).toFun ((P.boundaryMap k).toFun chain) (h_km1m1_eq_km2.symm ▸ g_km2) := by
+            rw [← h_km1m1_eq_km2]; rfl
+        _ = P.boundaryMapValue (k - 1) ((P.boundaryMap k).toFun chain) (h_km1m1_eq_km2.symm ▸ g_km2) := rfl
+        _ = (if h : 0 < k - 1 ∧ 0 ≤ k - 2 then
+              Finset.univ.sum fun F : P.facesIndexSet (k - 1) =>
+                if P.incident (idx_km2 ▸ (h_km1m1_eq_km2.symm ▸ g_km2)).val (idx_km1 ▸ F).val then
+                  ((P.boundaryMap k).toFun chain) F
                 else 0
-            else 0) ≠ 0 := by
-        sorry -- Apply function_ne_zero_implies_witness to extract witness
-
-      -- Let g be this witness (k-2)-face
-      let g := g_witness
-
-      -- The double sum counts pairs (F, G) where g < F < G
-      have h_count : (Finset.univ.sum fun F_km1 : P.facesIndexSet (k - 1) =>
-          if P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val then
-            Finset.univ.sum fun G_k : P.facesIndexSet k =>
-              if P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val then
-                chain G_k
-              else 0
-          else 0) =
-        (Finset.univ.sum fun G_k : P.facesIndexSet k =>
-          chain G_k *
-          (Finset.univ.filter fun F_km1 : P.facesIndexSet (k - 1) =>
-            P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val ∧
-            P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val).card) := by
-        sorry -- Swap sum order and factor out chain(G)
-
-      -- For each G with g < G, the filter counts intermediate faces
-      have h_diamond : ∀ G_k : P.facesIndexSet k,
-          (idx_k ▸ G_k).val.dim = k →
-          (idx_km2 ▸ g).val.dim = k - 2 →
-          (idx_km2 ▸ g).val < (idx_k ▸ G_k).val →
-          (Finset.univ.filter fun F_km1 : P.facesIndexSet (k - 1) =>
-            P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val ∧
-            P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val).card = 2 := by
-        intro G_k hG_dim hg_dim hg_lt_G
-        -- Apply diamond property: between g and G (differing by 2 dimensions),
-        -- there are exactly 2 intermediate faces
-        have h_codim : (idx_k ▸ G_k).val.dim = (idx_km2 ▸ g).val.dim + 2 := by omega
-        sorry -- Apply diamond_property theorem
-
-      -- Each term in the sum contributes chain(G) * 2
-      have h_sum_even : (Finset.univ.sum fun G_k : P.facesIndexSet k =>
-          chain G_k *
-          (Finset.univ.filter fun F_km1 : P.facesIndexSet (k - 1) =>
-            P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val ∧
-            P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val).card) =
-        (Finset.univ.sum fun G_k : P.facesIndexSet k =>
-          chain G_k * 2) := by
-        rw [Finset.sum_congr rfl]
-        simp
-        intro x
-        -- Apply h_diamond with the necessary conditions
-        have hx_dim : (idx_k ▸ x).val.dim = k := (idx_k ▸ x).property
-        have hg_dim : (idx_km2 ▸ g).val.dim = k - 2 := (idx_km2 ▸ g).property
-        -- Case split: either g < x (apply diamond property) or g ≮ x (filter is empty)
-        by_cases hg_lt_x : (idx_km2 ▸ g).val < (idx_k ▸ x).val
-        · -- Case: g < x, apply diamond property to get card = 2
-          rw [h_diamond x hx_dim hg_dim hg_lt_x]
-          norm_cast
-        · -- Case: g ≮ x, filter is empty so card = 0, and 0 = 2 in ZMod 2
-          have h_empty : (Finset.univ.filter fun F_km1 : P.facesIndexSet (k - 1) =>
-              P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val ∧
-              P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ x).val).card = 0 := by
-            rw [Finset.card_eq_zero, Finset.filter_eq_empty_iff]
-            intro F _
-            push_neg
-            intro h1 h2
-            -- From incidence relations, derive g < x, contradicting hg_lt_x
-            have hg_F : (idx_km2 ▸ g).val ≤ (idx_km1 ▸ F).val := incident_subset P h1
-            have hF_x : (idx_km1 ▸ F).val ≤ (idx_k ▸ x).val := incident_subset P h2
-            have hg_x : (idx_km2 ▸ g).val ≤ (idx_k ▸ x).val := le_trans hg_F hF_x
-            -- Show it's strict using dimensions
-            have h_strict_dim : (idx_km2 ▸ g).val.dim < (idx_k ▸ x).val.dim := by omega
-            -- To show g < x, we need hg_x and ¬(x ≤ g)
-            have h_not_ge : ¬((idx_k ▸ x).val ≤ (idx_km2 ▸ g).val) := by
-              intro hx_g
-              have : (idx_k ▸ x).val.dim ≤ (idx_km2 ▸ g).val.dim := dim_mono hx_g
-              omega
-            exact hg_lt_x ⟨hg_x, h_not_ge⟩
-          rw [h_empty]
-          -- Both 0 and 2 equal 0 in ZMod 2
-          simp [show (2 : ZMod 2) = 0 from by decide]
-
-
-      -- In ZMod 2, multiplying by 2 gives 0
-      have h_two_eq_zero : (2 : ZMod 2) = 0 := by decide
-
-      have h_sum_zero : (Finset.univ.sum fun G_k : P.facesIndexSet k =>
-          chain G_k * 2) = 0 := by
-        simp [h_two_eq_zero]
-        -- Each term is chain(G) * 0 = 0, and simp solves it
-
-      -- Chain the equalities to get our sum equals 0
-      have h_final : (Finset.univ.sum fun F_km1 : P.facesIndexSet (k - 1) =>
-          if P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val then
-            Finset.univ.sum fun G_k : P.facesIndexSet k =>
-              if P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val then
-                chain G_k
-              else 0
-          else 0) = 0 := by
-        rw [h_count, h_sum_even, h_sum_zero]
-
-      -- But this contradicts our witness that said it's nonzero!
-      exact h_witness h_final
+            else 0) := by
+            unfold boundaryMapValue
+            simp only [hkm1_cond, ite_true]
+        _ = (Finset.univ.sum fun F : P.facesIndexSet (k - 1) =>
+              if P.incident (idx_km2 ▸ g_km2).val (idx_km1 ▸ F).val then
+                ((P.boundaryMap k).toFun chain) F
+              else 0) := by
+            simp only [hkm1_cond, ite_true]
+            congr 1; ext F
+            congr 3
+            -- Simplify the double transport: h.symm ▸ (h ▸ g) = g
+            -- Since g_km2 = h_km1m1_eq_km2 ▸ g, we have h_km1m1_eq_km2.symm ▸ g_km2 = g
+            simp only [g_km2]
+        _ = (Finset.univ.sum fun F : P.facesIndexSet (k - 1) =>
+              if P.incident (idx_km2 ▸ g_km2).val (idx_km1 ▸ F).val then
+                P.boundaryMapValue k chain F
+              else 0) := rfl
+        _ = (Finset.univ.sum fun F : P.facesIndexSet (k - 1) =>
+              if P.incident (idx_km2 ▸ g_km2).val (idx_km1 ▸ F).val then
+                (if h : 0 < k ∧ 0 ≤ k - 1 then
+                  Finset.univ.sum fun G : P.facesIndexSet k =>
+                    if P.incident (idx_km1 ▸ F).val (idx_k ▸ G).val then chain G else 0
+                else 0)
+              else 0) := by
+            congr 1; ext F
+            split_ifs <;> (unfold boundaryMapValue; simp only [hk_cond, ite_true])
+        _ = (Finset.univ.sum fun F : P.facesIndexSet (k - 1) =>
+              if P.incident (idx_km2 ▸ g_km2).val (idx_km1 ▸ F).val then
+                Finset.univ.sum fun G : P.facesIndexSet k =>
+                  if P.incident (idx_km1 ▸ F).val (idx_k ▸ G).val then chain G else 0
+              else 0) := by
+            simp only [hk_cond, ite_true]
+        _ = 0 := by
+            -- Apply sum rearrangement to swap the order of summation
+            have h_rearrange : (Finset.univ.sum fun F : P.facesIndexSet (k - 1) =>
+                if P.incident (idx_km2 ▸ g_km2).val (idx_km1 ▸ F).val then
+                  Finset.univ.sum fun G : P.facesIndexSet k =>
+                    if P.incident (idx_km1 ▸ F).val (idx_k ▸ G).val then chain G else 0
+                else 0) =
+              (Finset.univ.sum fun G : P.facesIndexSet k =>
+                (Finset.univ.filter fun F : P.facesIndexSet (k - 1) =>
+                  P.incident (idx_km2 ▸ g_km2).val (idx_km1 ▸ F).val ∧
+                  P.incident (idx_km1 ▸ F).val (idx_k ▸ G).val).card • chain G) := by
+              convert sum_conditional_rearrange chain
+                (fun F => P.incident (idx_km2 ▸ g_km2).val (idx_km1 ▸ F).val)
+                (fun F G => P.incident (idx_km1 ▸ F).val (idx_k ▸ G).val) using 1
+              ext G; congr 1
+              rw [Finset.filter_congr]
+              intro F _; simp only [Bool.and_eq_true, Bool.decide_coe]
+            rw [h_rearrange]
+            -- Each filter has cardinality 2 by the diamond property, and 2 = 0 in ZMod 2
+            have h_all_two : ∀ G : P.facesIndexSet k,
+                (Finset.univ.filter fun F : P.facesIndexSet (k - 1) =>
+                  P.incident (idx_km2 ▸ g_km2).val (idx_km1 ▸ F).val ∧
+                  P.incident (idx_km1 ▸ F).val (idx_k ▸ G).val).card • chain G = 2 • chain G := by
+              intro G
+              congr 1
+              by_cases h_lt : (idx_km2 ▸ g_km2).val < (idx_k ▸ G).val
+              · -- g_km2 < G: apply diamond property to get card = 2
+                have hG_dim : (idx_k ▸ G).val.dim = k := (idx_k ▸ G).property
+                have hg_dim : (idx_km2 ▸ g_km2).val.dim = k - 2 := (idx_km2 ▸ g_km2).property
+                have h_codim : (idx_k ▸ G).val.dim = (idx_km2 ▸ g_km2).val.dim + 2 := by omega
+                exact diamond_property P (idx_km2 ▸ g_km2).val (idx_k ▸ G).val h_lt h_codim
+              · -- g_km2 ≮ G: filter is empty, card = 0, and 0 = 2 in ZMod 2
+                have h_empty : (Finset.univ.filter fun F : P.facesIndexSet (k - 1) =>
+                    P.incident (idx_km2 ▸ g_km2).val (idx_km1 ▸ F).val ∧
+                    P.incident (idx_km1 ▸ F).val (idx_k ▸ G).val).card = 0 := by
+                  rw [Finset.card_eq_zero, Finset.filter_eq_empty_iff]
+                  intro F _; push_neg; intro h1 h2
+                  have hg_F : (idx_km2 ▸ g_km2).val ≤ (idx_km1 ▸ F).val := incident_subset P h1
+                  have hF_G : (idx_km1 ▸ F).val ≤ (idx_k ▸ G).val := incident_subset P h2
+                  have hg_G : (idx_km2 ▸ g_km2).val ≤ (idx_k ▸ G).val := le_trans hg_F hF_G
+                  have h_strict : (idx_km2 ▸ g_km2).val.dim < (idx_k ▸ G).val.dim := by omega
+                  have h_not_ge : ¬((idx_k ▸ G).val ≤ (idx_km2 ▸ g_km2).val) := by
+                    intro hG_g; have := dim_mono hG_g; omega
+                  exact h_lt ⟨hg_G, h_not_ge⟩
+                rw [h_empty]; simp [show (2 : ZMod 2) = 0 from by decide]
+            simp only [h_all_two]
+            -- Sum of 2 • chain G equals sum of 0 • chain G = 0
+            simp [show (2 : ZMod 2) = 0 from by decide]
 
     · -- Case: k = 1 (since k > 0 but not k - 1 > 0)
       -- Here k - 1 = 0, so boundaryMap 0 is zero (since ¬(0 < 0))
