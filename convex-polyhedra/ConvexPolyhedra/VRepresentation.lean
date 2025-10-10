@@ -695,6 +695,28 @@ noncomputable def boundaryMap (P : ConvexPolyhedron E) (k : ℤ) :
       rfl
 }
 
+/-- If a function from a finite type to ZMod 2 is nonzero, then there exists
+a witness where the function evaluates to a nonzero value.
+
+This is used to extract a specific face from the assumption that a chain complex
+composition is nonzero. -/
+lemma function_ne_zero_implies_witness {α : Type*} [Fintype α] (f : α → ZMod 2) :
+    f ≠ 0 → ∃ a : α, f a ≠ 0 := by
+  intro h_ne
+  -- By contradiction: if f a = 0 for all a, then f = 0
+  by_contra h_all_zero
+  push_neg at h_all_zero
+  -- So f is the zero function
+  have h_f_zero : f = 0 := by
+    ext a
+    exact h_all_zero a
+  -- But this contradicts h_ne
+  exact h_ne h_f_zero
+
+set_option maxHeartbeats 5000000 in
+-- The proof involves nested case analysis and double summations over face lattices
+-- which require substantial elaboration time, particularly in the main k≥2 case
+-- where we expand the composition of boundary maps and apply the diamond property.
 /-- The boundary of a boundary is zero: ∂² = 0.
 
 This is the key algebraic property that makes the face lattice into a chain complex.
@@ -704,7 +726,8 @@ as many times as there are (k-1)-faces F with H ⊆ F ⊆ G. By the diamond prop
 this count is always 2 (for codimension 2 pairs), which equals 0 in ZMod 2.
 
 Working over ZMod 2, any even count becomes 0, so ∂²(G) = 0 for each k-face G.
-By linearity, ∂² = 0 on the entire chain group. -/
+By linearity, ∂² = 0 on the entire chain group.
+-/
 theorem boundary_comp_boundary (P : ConvexPolyhedron E) (k : ℤ) :
     (P.boundaryMap (k - 1)).comp (P.boundaryMap k) = 0 := by
   -- Proof strategy (mirroring boundaryMap structure):
@@ -719,50 +742,202 @@ theorem boundary_comp_boundary (P : ConvexPolyhedron E) (k : ℤ) :
     by_cases hkm1 : 0 < k - 1
     · -- Case: k > 1 (so k ≥ 2), both boundaryMap k and boundaryMap (k-1) are non-zero
       -- This is where we need the diamond property
-      sorry  -- MAIN COMPUTATIONAL CASE (k ≥ 2):
-             --
-             -- Goal: show (∂_{k-1} ∘ ∂_k) = 0
-             --
-             -- Strategy:
-             -- 1. Expand the composition: for each (k-2)-face g,
-             --    (∂_{k-1} ∘ ∂_k)(x)(g) = Σ_{F:(k-1)-face} [Σ_{G:k-face} x(G) if g⊆F⊆G]
-             --
-             -- 2. Swap sum order to: Σ_{G:k-face} x(G) · #{F | g⊆F⊆G, dim F = dim g + 1}
-             --
-             -- 3. Apply diamond property: when dim G = dim g + 2, count = 2
-             --
-             -- 4. Simplify: x(G) · 2 = x(G) · 0 = 0 in ZMod 2
-             --
-             -- DEPENDENCIES (currently sorry):
-             -- - diamond_property: |{F | g < F < G, dim F = dim g + 1}| = 2
-             -- - dim_lt_of_ssubset: F < G implies dim F < dim G
-             -- - Sum manipulation lemmas for swapping filtered sums
+      -- MAIN COMPUTATIONAL CASE (k ≥ 2):
+      --
+      -- Goal: show (∂_{k-1} ∘ ∂_k) = 0
+      --
+      -- Strategy:
+      -- 1. Expand the composition: for each (k-2)-face g,
+      --    (∂_{k-1} ∘ ∂_k)(x)(g) = Σ_{F:(k-1)-face} [Σ_{G:k-face} x(G) if g⊆F⊆G]
+      --
+      -- 2. Swap sum order to: Σ_{G:k-face} x(G) · #{F | g⊆F⊆G, dim F = dim g + 1}
+      --
+      -- 3. Apply diamond property: when dim G = dim g + 2, count = 2
+      --
+      -- 4. Simplify: x(G) · 2 = x(G) · 0 = 0 in ZMod 2
+
+      -- Start with extensionality
+      ext chain
+      funext g
+      simp [LinearMap.comp_apply, LinearMap.zero_apply]
+
+      -- Unfold the boundary maps
+      unfold boundaryMap boundaryMapValue
+
+      -- We have k > 1, so k ≥ 2
+      have hk_ge_2 : k ≥ 2 := by omega
+
+      -- Set up the conditions for both boundary maps
+      have hk_cond : 0 < k ∧ 0 ≤ k - 1 := by omega
+      have hkm1_cond : 0 < k - 1 ∧ 0 ≤ k - 2 := by omega
+
+      -- Simplify using these conditions
+      simp only [hk_cond, hkm1_cond]
+
+      -- Set up type equalities for index sets using explicit conditions
+      have hk_nonneg : 0 ≤ k := by omega
+      have hkm1_nonneg : 0 ≤ k - 1 := by omega
+      have hkm2_nonneg : 0 ≤ k - 2 := by omega
+
+      have idx_k : P.facesIndexSet k = { F : Face P // F.dim = k } := by
+        unfold facesIndexSet; rw [if_pos hk_nonneg]
+      have idx_km1 : P.facesIndexSet (k - 1) = { F : Face P // F.dim = k - 1 } := by
+        unfold facesIndexSet; rw [if_pos hkm1_nonneg]
+      have idx_km2 : P.facesIndexSet (k - 2) = { F : Face P // F.dim = k - 2 } := by
+        unfold facesIndexSet; rw [if_pos hkm2_nonneg]
+
+      -- Now we have a double sum:
+      -- Σ_F:(k-1)-faces [if g incident F then Σ_G:k-faces [if F incident G then chain(G)]]
+      --
+      -- This equals (after swapping sums):
+      -- Σ_G:k-faces [chain(G) · #{F:(k-1)-faces | g incident F ∧ F incident G}]
+      --
+      -- By diamond property: #{F | g incident F ∧ F incident G} = 2 when g.dim = k-2 and G.dim = k
+      -- And 2 = 0 in ZMod 2, so each term is 0
+
+      -- Proof by contradiction using the diamond property
+
+      -- We've already applied ext/funext, so we're working with a specific chain
+      -- Assume for contradiction that the double sum for this chain is not identically zero
+      by_contra h_nonzero
+
+      -- Extract a witness (k-2)-face where the double sum is nonzero
+      -- This uses function_ne_zero_implies_witness but the full elaboration is expensive
+      have ⟨g_witness, h_witness⟩ : ∃ g : P.facesIndexSet (k - 2),
+          (Finset.univ.sum fun F_km1 : P.facesIndexSet (k - 1) =>
+            if P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val then
+              Finset.univ.sum fun G_k : P.facesIndexSet k =>
+                if P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val then
+                  chain G_k
+                else 0
+            else 0) ≠ 0 := by
+        sorry -- Apply function_ne_zero_implies_witness to extract witness
+
+      -- Let g be this witness (k-2)-face
+      let g := g_witness
+
+      -- The double sum counts pairs (F, G) where g < F < G
+      have h_count : (Finset.univ.sum fun F_km1 : P.facesIndexSet (k - 1) =>
+          if P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val then
+            Finset.univ.sum fun G_k : P.facesIndexSet k =>
+              if P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val then
+                chain G_k
+              else 0
+          else 0) =
+        (Finset.univ.sum fun G_k : P.facesIndexSet k =>
+          chain G_k *
+          (Finset.univ.filter fun F_km1 : P.facesIndexSet (k - 1) =>
+            P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val ∧
+            P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val).card) := by
+        sorry -- Swap sum order and factor out chain(G)
+
+      -- For each G with g < G, the filter counts intermediate faces
+      have h_diamond : ∀ G_k : P.facesIndexSet k,
+          (idx_k ▸ G_k).val.dim = k →
+          (idx_km2 ▸ g).val.dim = k - 2 →
+          (idx_km2 ▸ g).val < (idx_k ▸ G_k).val →
+          (Finset.univ.filter fun F_km1 : P.facesIndexSet (k - 1) =>
+            P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val ∧
+            P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val).card = 2 := by
+        intro G_k hG_dim hg_dim hg_lt_G
+        -- Apply diamond property: between g and G (differing by 2 dimensions),
+        -- there are exactly 2 intermediate faces
+        have h_codim : (idx_k ▸ G_k).val.dim = (idx_km2 ▸ g).val.dim + 2 := by omega
+        sorry -- Apply diamond_property theorem
+
+      -- Each term in the sum contributes chain(G) * 2
+      have h_sum_even : (Finset.univ.sum fun G_k : P.facesIndexSet k =>
+          chain G_k *
+          (Finset.univ.filter fun F_km1 : P.facesIndexSet (k - 1) =>
+            P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val ∧
+            P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val).card) =
+        (Finset.univ.sum fun G_k : P.facesIndexSet k =>
+          chain G_k * 2) := by
+        rw [Finset.sum_congr rfl]
+        simp
+        intro x
+        -- Apply h_diamond with the necessary conditions
+        have hx_dim : (idx_k ▸ x).val.dim = k := (idx_k ▸ x).property
+        have hg_dim : (idx_km2 ▸ g).val.dim = k - 2 := (idx_km2 ▸ g).property
+        -- Case split: either g < x (apply diamond property) or g ≮ x (filter is empty)
+        by_cases hg_lt_x : (idx_km2 ▸ g).val < (idx_k ▸ x).val
+        · -- Case: g < x, apply diamond property to get card = 2
+          rw [h_diamond x hx_dim hg_dim hg_lt_x]
+          norm_cast
+        · -- Case: g ≮ x, filter is empty so card = 0, and 0 = 2 in ZMod 2
+          have h_empty : (Finset.univ.filter fun F_km1 : P.facesIndexSet (k - 1) =>
+              P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val ∧
+              P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ x).val).card = 0 := by
+            rw [Finset.card_eq_zero, Finset.filter_eq_empty_iff]
+            intro F _
+            push_neg
+            intro h1 h2
+            -- From incidence relations, derive g < x, contradicting hg_lt_x
+            have hg_F : (idx_km2 ▸ g).val ≤ (idx_km1 ▸ F).val := incident_subset P h1
+            have hF_x : (idx_km1 ▸ F).val ≤ (idx_k ▸ x).val := incident_subset P h2
+            have hg_x : (idx_km2 ▸ g).val ≤ (idx_k ▸ x).val := le_trans hg_F hF_x
+            -- Show it's strict using dimensions
+            have h_strict_dim : (idx_km2 ▸ g).val.dim < (idx_k ▸ x).val.dim := by omega
+            -- To show g < x, we need hg_x and ¬(x ≤ g)
+            have h_not_ge : ¬((idx_k ▸ x).val ≤ (idx_km2 ▸ g).val) := by
+              intro hx_g
+              have : (idx_k ▸ x).val.dim ≤ (idx_km2 ▸ g).val.dim := dim_mono hx_g
+              omega
+            exact hg_lt_x ⟨hg_x, h_not_ge⟩
+          rw [h_empty]
+          -- Both 0 and 2 equal 0 in ZMod 2
+          simp [show (2 : ZMod 2) = 0 from by decide]
+
+
+      -- In ZMod 2, multiplying by 2 gives 0
+      have h_two_eq_zero : (2 : ZMod 2) = 0 := by decide
+
+      have h_sum_zero : (Finset.univ.sum fun G_k : P.facesIndexSet k =>
+          chain G_k * 2) = 0 := by
+        simp [h_two_eq_zero]
+        -- Each term is chain(G) * 0 = 0, and simp solves it
+
+      -- Chain the equalities to get our sum equals 0
+      have h_final : (Finset.univ.sum fun F_km1 : P.facesIndexSet (k - 1) =>
+          if P.incident (idx_km2 ▸ g).val (idx_km1 ▸ F_km1).val then
+            Finset.univ.sum fun G_k : P.facesIndexSet k =>
+              if P.incident (idx_km1 ▸ F_km1).val (idx_k ▸ G_k).val then
+                chain G_k
+              else 0
+          else 0) = 0 := by
+        rw [h_count, h_sum_even, h_sum_zero]
+
+      -- But this contradicts our witness that said it's nonzero!
+      exact h_witness h_final
 
     · -- Case: k = 1 (since k > 0 but not k - 1 > 0)
-      -- Here k - 1 = 0, so boundaryMap (k-1) = boundaryMap 0 is zero
+      -- Here k - 1 = 0, so boundaryMap 0 is zero (since ¬(0 < 0))
       -- Therefore the composition is zero
       have hk_eq_1 : k = 1 := by omega
       have h_km1_eq_0 : k - 1 = 0 := by omega
-      sorry  -- TRIVIAL CASE (k = 1):
-             -- Need to show: boundaryMap 0 ∘ₗ boundaryMap 1 = 0
-             -- This is true because boundaryMap 0 = 0 (since ¬(0 < 0))
-             -- So the composition is 0 ∘ₗ boundaryMap 1 = 0
-             --
-             -- The issue is that boundaryMap is defined using `by_cases` in tactic mode,
-             -- so it doesn't reduce definitionally. Need to either:
-             -- 1. Refactor boundaryMap to use if-then-else instead of by_cases
-             -- 2. Prove a lemma: boundaryMap n = 0 when ¬(0 < n)
-             -- 3. Use ext and unfold to manually show the maps are equal
+      -- Show boundaryMap 0 ∘ boundaryMap 1 = 0 using extensionality
+      ext chain g
+      simp [LinearMap.comp_apply, LinearMap.zero_apply]
+      unfold boundaryMap boundaryMapValue
+      -- For boundaryMap 0, the condition 0 < 0 ∧ 0 ≤ -1 is false
+      simp [h_km1_eq_0]
+      rw [h_km1_eq_0]
+      rfl
 
   · -- Case: k ≤ 0
-    -- Here boundaryMap k is zero, so the composition is zero
+    -- Here boundaryMap k is zero (since ¬(0 < k))
+    -- Therefore the composition is zero
     have hk_le_0 : k ≤ 0 := by omega
-    sorry  -- TRIVIAL CASE (k ≤ 0):
-           -- Need to show: boundaryMap (k-1) ∘ₗ boundaryMap k = 0
-           -- This is true because boundaryMap k = 0 (since ¬(0 < k) when k ≤ 0)
-           -- So the composition is boundaryMap (k-1) ∘ₗ 0 = 0
-           --
-           -- Same issue as the k = 1 case - boundaryMap doesn't reduce definitionally
+    -- Show boundaryMap (k-1) ∘ boundaryMap k = 0 using extensionality
+    ext chain
+    funext g
+    simp [LinearMap.comp_apply, LinearMap.zero_apply]
+    unfold boundaryMap boundaryMapValue
+    -- Split on all the if conditions
+    split_ifs
+    · -- All conditions true - but this is impossible when k ≤ 0
+      omega
+    · rfl
 
 -- TODO: Define faceChainComplex (P : ConvexPolyhedron E) : ChainComplex (ZMod 2) ℤ
 -- This requires CategoryTheory infrastructure for chain complexes indexed by ℤ.
