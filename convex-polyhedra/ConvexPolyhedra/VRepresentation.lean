@@ -419,6 +419,16 @@ theorem dim_lt_of_ssubset {P : ConvexPolyhedron E} {F G : Face P}
   -- Strict containment in convex sets implies strict dimension increase
   sorry  -- Requires affine dimension properties
 
+/-- Every face has dimension at most the polyhedron's dimension.
+
+This is the fundamental constraint that makes `exists_saturated_chain` well-defined:
+since G is a Face P, we have G.dim ≤ P.dim, which means the hypothesis
+`G.dim = F.dim + k` automatically bounds k ≤ P.dim. -/
+theorem face_dim_le_polyhedron_dim {P : ConvexPolyhedron E} (F : Face P) : F.dim ≤ P.dim := by
+  -- F.toSet ⊆ P by subset_polyhedron
+  -- Affine dimension is monotone under subset
+  sorry  -- Requires affine dimension properties from Mathlib
+
 /-- Faces are graded by dimension: the dimension function respects the partial order -/
 theorem face_grading {P : ConvexPolyhedron E} {F G : Face P} :
     F ≤ G → F.dim ≤ G.dim := dim_mono
