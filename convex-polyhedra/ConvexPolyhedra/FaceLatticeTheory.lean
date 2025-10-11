@@ -94,7 +94,49 @@ theorem exists_vertex_not_in_affineSpan {P : ConvexPolyhedron E}
     (hFG : F < G)
     (hdim : F.dim < G.dim) :
     ∃ v ∈ G.toSet ∩ (P.vertices : Set E), v ∉ affineSpan ℝ F.toSet := by
-  sorry
+  -- Proof by contradiction
+  by_contra h
+  push_neg at h
+  -- h : ∀ v ∈ G.toSet ∩ P.vertices, v ∈ affineSpan ℝ F.toSet
+
+  -- Key claim: G.toSet ⊆ affineSpan ℝ F.toSet
+  have h_subset : G.toSet ⊆ affineSpan ℝ F.toSet := by
+    -- Get a Face witness for G
+    obtain ⟨G_face, hG_face⟩ := GeometricFace.exists_face_witness G
+    -- G.toSet is the convex hull of G_face.vertices
+    have hG_conv : G.toSet = convexHull ℝ (G_face.vertices : Set E) := by
+      rw [← hG_face, Face.toSet]
+    -- All vertices of G_face are in G.toSet ∩ P.vertices
+    have hG_verts_in : (G_face.vertices : Set E) ⊆ G.toSet ∩ (P.vertices : Set E) := by
+      intro v hv
+      constructor
+      · rw [hG_conv]
+        exact subset_convexHull ℝ _ hv
+      · exact G_face.subset hv
+    -- By hypothesis h, all these vertices are in affineSpan ℝ F.toSet
+    have hG_verts_span : (G_face.vertices : Set E) ⊆ affineSpan ℝ F.toSet := by
+      intro v hv
+      exact h v (hG_verts_in hv)
+    -- convexHull of vertices ⊆ affineSpan of vertices
+    calc G.toSet
+        = convexHull ℝ (G_face.vertices : Set E) := hG_conv
+      _ ⊆ affineSpan ℝ (G_face.vertices : Set E) := convexHull_subset_affineSpan _
+      _ ⊆ affineSpan ℝ F.toSet := affineSpan_mono ℝ hG_verts_span
+
+  -- F.toSet ⊆ affineSpan ℝ F.toSet (basic property)
+  have hF_span : F.toSet ⊆ affineSpan ℝ F.toSet := subset_affineSpan ℝ F.toSet
+
+  -- Since G.toSet ⊆ affineSpan ℝ F.toSet, we get dimension constraint
+  have h_dim_le : G.dim ≤ F.dim := by
+    -- Key lemma needed: If s ⊆ affineSpan ℝ t, then affineDim s ≤ affineDim t
+    -- This follows from:
+    --   1. affineSpan ℝ s ⊆ affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t (monotonicity + idempotence)
+    --   2. affineDim s = finrank (direction (affineSpan ℝ s))
+    --   3. Submodule inclusion implies finrank inequality
+    sorry
+
+  -- Contradiction with hdim : F.dim < G.dim
+  omega
 
 /-- Given a vertex v in geometric face G but not in the affine span of face F,
 there exists a geometric face H containing F and v with dimension exactly dim F + 1.
