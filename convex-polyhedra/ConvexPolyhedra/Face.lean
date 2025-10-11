@@ -91,6 +91,35 @@ theorem convex (F : Face P) : Convex ℝ F.toSet :=
 theorem subset_polyhedron (F : Face P) : F.toSet ⊆ (P : Set E) :=
   convexHull_mono (by exact_mod_cast F.subset)
 
+/-- All vertices in a face achieve the same value under the supporting functional.
+This is a direct consequence of is_maximal: each vertex in F.vertices maximizes
+F.support over all of P.vertices, so they all achieve the maximum value. -/
+theorem support_const_on_face_vertices (F : Face P) :
+    ∀ v ∈ F.vertices, ∀ v' ∈ F.vertices, F.support v = F.support v' := by
+  intro v hv v' hv'
+  -- Both v and v' maximize F.support over P.vertices (by is_maximal)
+  have hv_max : ∀ w ∈ P.vertices, F.support w ≤ F.support v := by
+    intro w hw
+    exact (F.is_maximal v (F.subset hv)).mp hv w hw
+  have hv'_max : ∀ w ∈ P.vertices, F.support w ≤ F.support v' := by
+    intro w hw
+    exact (F.is_maximal v' (F.subset hv')).mp hv' w hw
+  -- In particular, F.support v ≤ F.support v' and F.support v' ≤ F.support v
+  have h1 : F.support v ≤ F.support v' := hv'_max v (F.subset hv)
+  have h2 : F.support v' ≤ F.support v := hv_max v' (F.subset hv')
+  exact le_antisymm h1 h2
+
+/-- The supporting functional is constant on the face.
+Since all vertices achieve the same value M, and the functional is linear,
+all points in the convex hull also achieve M. -/
+theorem support_const_on_face (F : Face P) (hne : F.vertices.Nonempty) :
+    ∀ x ∈ F.toSet, ∀ v ∈ F.vertices, F.support x = F.support v := by
+  intro x hx v hv
+  -- The proof requires showing that linear functionals preserve the constant value
+  -- on convex combinations. This follows from:
+  -- If x = Σᵢ λᵢ vᵢ where all vᵢ achieve value M, then F.support x = Σᵢ λᵢ M = M
+  sorry
+
 /-- Every face of a polytope is an exposed face.
 
 This connects our `Face` structure to Mathlib's `IsExposed` predicate from
@@ -120,33 +149,45 @@ theorem isExposed (F : Face P) : IsExposed ℝ (P : Set E) F.toSet := by
       exact F.subset_polyhedron hx
     · -- x maximizes F.support over P
       intro y hy
-      -- Strategy: Show all vertices in F.vertices achieve the same maximum M,
-      -- so F.support x = M by linearity. For any y ∈ P, F.support y ≤ M.
+      -- KEY INSIGHT: By analyzing the Face definition, we discovered that is_maximal
+      -- implies all vertices in F.vertices achieve the SAME value M.
+      -- This dramatically simplifies the proof!
 
-      -- Key lemma: P is the convex hull of P.vertices
-      have hP_hull : (P : Set E) = convexHull ℝ (P.vertices : Set E) := rfl
+      -- Get nonemptiness of F.vertices from h_nonempty
+      have hF_nonempty : F.vertices.Nonempty := by
+        sorry  -- Can derive from h_nonempty : F.toSet.Nonempty
 
-      -- For now, we'll use sorry to complete this direction
-      -- The full proof requires showing:
-      -- 1. All vertices in F.vertices achieve the same maximum value M
-      -- 2. F.support x = M (by linearity on convex hull)
-      -- 3. For any y ∈ P, F.support y ≤ M
-      sorry
+      -- Get a vertex to establish the maximum value M
+      obtain ⟨v, hv⟩ := hF_nonempty
+
+      -- By support_const_on_face, F.support x = F.support v = M (once proven)
+      have hx_eq : F.support x = F.support v := by
+        sorry  -- Would follow from support_const_on_face once proven
+
+      -- By is_maximal, v maximizes over P.vertices
+      have hv_max : ∀ w ∈ P.vertices, F.support w ≤ F.support v := by
+        exact (F.is_maximal v (F.subset hv)).mp hv
+
+      sorry  -- Need: F.support y ≤ max over P.vertices (requires convex hull lemma)
   · -- Reverse direction: x ∈ P and x maximizes F.support → x ∈ F.toSet
     intro ⟨hx_in_P, hx_max⟩
-    -- Proof strategy:
-    -- 1. Write x = Σᵢ λᵢ vᵢ where vᵢ ∈ P.vertices (since x ∈ convexHull P.vertices)
-    -- 2. We have F.support x = Σᵢ λᵢ (F.support vᵢ) by linearity
-    -- 3. Let M = max {F.support v | v ∈ P.vertices}. Since x maximizes, F.support x ≥ M
-    -- 4. But F.support x = Σᵢ λᵢ (F.support vᵢ) ≤ Σᵢ λᵢ M = M, so F.support x = M
-    -- 5. This means all vᵢ with λᵢ > 0 must achieve F.support vᵢ = M
-    -- 6. By is_maximal, these vᵢ are in F.vertices
-    -- 7. Therefore x ∈ convexHull F.vertices = F.toSet
+    -- KEY INSIGHT: Combined with support_const_on_face_vertices, the maximality
+    -- condition forces x to be in convexHull F.vertices.
+
+    -- Proof strategy (using our helper lemmas):
+    -- 1. Let M = max {F.support v | v ∈ P.vertices}
+    -- 2. Since x maximizes, F.support x = M
+    -- 3. Write x = Σᵢ λᵢ vᵢ where vᵢ ∈ P.vertices
+    -- 4. F.support x = Σᵢ λᵢ (F.support vᵢ) = M (by linearity)
+    -- 5. Since each F.support vᵢ ≤ M and the weighted average equals M,
+    --    all vᵢ with λᵢ > 0 must have F.support vᵢ = M
+    -- 6. By is_maximal, these vᵢ ∈ F.vertices
+    -- 7. By support_const_on_face_vertices, all such vᵢ achieve the same value
+    -- 8. Therefore x ∈ convexHull F.vertices = F.toSet
     --
-    -- Required Mathlib infrastructure:
-    -- - Characterization of convex hull as convex combinations
-    -- - Linear map preserves convex combinations
-    -- - Inequality reasoning on finite sums
+    -- The key observation: is_maximal characterizes F.vertices as EXACTLY
+    -- the maximizers, and support_const_on_face_vertices shows they all
+    -- achieve the same value.
     sorry
 
 /-- The affine dimension of a face -/
