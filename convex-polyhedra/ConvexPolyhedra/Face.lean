@@ -211,9 +211,9 @@ theorem isExposed (F : Face P) : IsExposed ℝ (P : Set E) F.toSet := by
       -- Get a vertex to establish the maximum value M
       obtain ⟨v, hv⟩ := hF_nonempty
 
-      -- By support_const_on_face, F.support x = F.support v = M (once proven)
-      have hx_eq : F.support x = F.support v := by
-        sorry  -- Would follow from support_const_on_face once proven
+      -- By support_const_on_face, F.support x = F.support v = M
+      have hx_eq : F.support x = F.support v :=
+        F.support_const_on_face ⟨v, hv⟩ x hx v hv
 
       -- By is_maximal, v maximizes over P.vertices
       have hv_max : ∀ w ∈ P.vertices, F.support w ≤ F.support v := by
