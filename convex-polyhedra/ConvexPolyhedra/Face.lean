@@ -110,11 +110,44 @@ theorem isExposed (F : Face P) : IsExposed ℝ (P : Set E) F.toSet := by
   intro h_nonempty
   use F.support
   -- Need to show: F.toSet = {x | x ∈ P ∧ ∀ y ∈ P, F.support y ≤ F.support x}
-  -- This follows from the fact that:
-  -- - F.toSet = convexHull ℝ (F.vertices : Set E)
-  -- - F.vertices are exactly the vertices where F.support achieves its maximum (by is_maximal)
-  -- - Points in convexHull of maximizers also achieve the maximum for linear functionals
-  sorry
+  ext x
+  simp only [Set.mem_setOf_eq]
+  constructor
+  · -- Forward direction: x ∈ F.toSet → x ∈ P ∧ x maximizes F.support
+    intro hx
+    constructor
+    · -- x ∈ P follows from F.toSet ⊆ P
+      exact F.subset_polyhedron hx
+    · -- x maximizes F.support over P
+      intro y hy
+      -- Strategy: Show all vertices in F.vertices achieve the same maximum M,
+      -- so F.support x = M by linearity. For any y ∈ P, F.support y ≤ M.
+
+      -- Key lemma: P is the convex hull of P.vertices
+      have hP_hull : (P : Set E) = convexHull ℝ (P.vertices : Set E) := rfl
+
+      -- For now, we'll use sorry to complete this direction
+      -- The full proof requires showing:
+      -- 1. All vertices in F.vertices achieve the same maximum value M
+      -- 2. F.support x = M (by linearity on convex hull)
+      -- 3. For any y ∈ P, F.support y ≤ M
+      sorry
+  · -- Reverse direction: x ∈ P and x maximizes F.support → x ∈ F.toSet
+    intro ⟨hx_in_P, hx_max⟩
+    -- Proof strategy:
+    -- 1. Write x = Σᵢ λᵢ vᵢ where vᵢ ∈ P.vertices (since x ∈ convexHull P.vertices)
+    -- 2. We have F.support x = Σᵢ λᵢ (F.support vᵢ) by linearity
+    -- 3. Let M = max {F.support v | v ∈ P.vertices}. Since x maximizes, F.support x ≥ M
+    -- 4. But F.support x = Σᵢ λᵢ (F.support vᵢ) ≤ Σᵢ λᵢ M = M, so F.support x = M
+    -- 5. This means all vᵢ with λᵢ > 0 must achieve F.support vᵢ = M
+    -- 6. By is_maximal, these vᵢ are in F.vertices
+    -- 7. Therefore x ∈ convexHull F.vertices = F.toSet
+    --
+    -- Required Mathlib infrastructure:
+    -- - Characterization of convex hull as convex combinations
+    -- - Linear map preserves convex combinations
+    -- - Inequality reasoning on finite sums
+    sorry
 
 /-- The affine dimension of a face -/
 noncomputable def dim (F : Face P) : ℤ :=
