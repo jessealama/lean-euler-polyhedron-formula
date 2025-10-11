@@ -127,11 +127,13 @@ theorem exists_vertex_not_in_affineSpan {P : ConvexPolyhedron E}
     have hG_verts_span : (G_face.vertices : Set E) ⊆ affineSpan ℝ F.toSet := by
       intro v hv
       exact h v (hG_verts_in hv)
-    -- convexHull of vertices ⊆ affineSpan of vertices
+    -- convexHull of vertices ⊆ affineSpan of vertices ⊆ affineSpan of F
     calc G.toSet
         = convexHull ℝ (G_face.vertices : Set E) := hG_conv
       _ ⊆ affineSpan ℝ (G_face.vertices : Set E) := convexHull_subset_affineSpan _
-      _ ⊆ affineSpan ℝ F.toSet := affineSpan_mono ℝ hG_verts_span
+      _ ⊆ affineSpan ℝ F.toSet := by
+          -- Use affineSpan_le: if s ⊆ affine subspace S, then affineSpan s ≤ S
+          exact (affineSpan_le.mpr hG_verts_span : _)
 
   -- F.toSet ⊆ affineSpan ℝ F.toSet (basic property)
   have hF_span : F.toSet ⊆ affineSpan ℝ F.toSet := subset_affineSpan ℝ F.toSet
