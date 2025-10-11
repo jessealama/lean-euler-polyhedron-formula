@@ -168,7 +168,24 @@ theorem isExposed (F : Face P) : IsExposed ℝ (P : Set E) F.toSet := by
       have hv_max : ∀ w ∈ P.vertices, F.support w ≤ F.support v := by
         exact (F.is_maximal v (F.subset hv)).mp hv
 
-      sorry  -- Need: F.support y ≤ max over P.vertices (requires convex hull lemma)
+      -- The key: linear functionals on convex hulls are bounded by max on vertices
+      -- Since y ∈ convexHull P.vertices and v maximizes over P.vertices,
+      -- we have F.support y ≤ F.support v = F.support x
+      calc F.support y
+          ≤ F.support v := by
+              -- STANDARD LEMMA NEEDED: For a continuous linear functional φ on a finite set S,
+              -- sup{φ(x) | x ∈ convexHull S} = sup{φ(s) | s ∈ S}
+              --
+              -- Proof idea: If y = Σᵢ λᵢ wᵢ where wᵢ ∈ P.vertices, Σᵢ λᵢ = 1, λᵢ ≥ 0, then
+              -- F.support y = F.support (Σᵢ λᵢ wᵢ)      (by definition)
+              --             = Σᵢ λᵢ (F.support wᵢ)        (by linearity)
+              --             ≤ Σᵢ λᵢ (F.support v)         (since each F.support wᵢ ≤ F.support v)
+              --             = (F.support v) · (Σᵢ λᵢ)     (factoring out)
+              --             = F.support v                   (since Σᵢ λᵢ = 1)
+              --
+              -- This is the KEY technical lemma for the entire isExposed proof!
+              sorry
+        _ = F.support x := hx_eq.symm
   · -- Reverse direction: x ∈ P and x maximizes F.support → x ∈ F.toSet
     intro ⟨hx_in_P, hx_max⟩
     -- KEY INSIGHT: Combined with support_const_on_face_vertices, the maximality
