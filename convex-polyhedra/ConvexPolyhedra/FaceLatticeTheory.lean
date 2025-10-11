@@ -179,6 +179,32 @@ def geometricFaceInterval (P : ConvexPolyhedron E) (F G : GeometricFace P) :
     Set (GeometricFace P) :=
   Set.Ioo F G
 
+/-- The open interval in the geometric face lattice is finite.
+
+Proof: The interval is a subset of ⋃_{k ∈ (F.dim, G.dim)} {H | H.dim = k},
+and each of those sets is finite by geometric_k_faces_finite. -/
+theorem geometricFaceInterval_finite (P : ConvexPolyhedron E) (F G : GeometricFace P) :
+    (P.geometricFaceInterval F G).Finite := by
+  -- The interval is a subset of the union of k-faces for k ∈ (F.dim, G.dim)
+  have h_subset : P.geometricFaceInterval F G ⊆ ⋃ k ∈ Set.Ioo F.dim G.dim, {H : GeometricFace P | H.dim = k} := by
+    intro H ⟨hFH, hHG⟩
+    simp only [Set.mem_iUnion, Set.mem_setOf_eq, Set.mem_Ioo]
+    use H.dim
+    refine ⟨⟨?_, ?_⟩, rfl⟩
+    · exact geometric_dim_lt_of_ssubset hFH
+    · exact geometric_dim_lt_of_ssubset hHG
+
+  -- Apply finiteness: finite union of finite sets
+  apply Set.Finite.subset _ h_subset
+  apply Set.Finite.biUnion (Set.finite_Ioo F.dim G.dim)
+  intro k _
+  exact geometric_k_faces_finite P k
+
+/-- Instance: The open interval in the geometric face lattice has a Finite instance. -/
+instance geometricFaceInterval_instFinite (P : ConvexPolyhedron E) (F G : GeometricFace P) :
+    Finite (P.geometricFaceInterval F G) :=
+  (geometricFaceInterval_finite P F G).to_subtype
+
 /-- Intermediate geometric faces of codimension 1 between F and G -/
 def geometricIntermediateFaces (P : ConvexPolyhedron E) (F G : GeometricFace P) :
     Set (GeometricFace P) :=
