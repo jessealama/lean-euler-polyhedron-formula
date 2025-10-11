@@ -93,7 +93,19 @@ This follows from the fact that affineSpan is monotone and idempotent, combined 
 the relationship between affine dimension and the dimension of the direction submodule. -/
 theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan ℝ t) :
     affineDim ℝ s ≤ affineDim ℝ t := by
-  sorry
+  -- Use affineSpan_mono to get affineSpan ℝ s ≤ affineSpan ℝ (affineSpan ℝ t)
+  have h1 : affineSpan ℝ s ≤ affineSpan ℝ (affineSpan ℝ t) := affineSpan_mono ℝ h
+  -- Use idempotence: affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t
+  have h2 : affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t := AffineSubspace.affineSpan_coe _
+  -- Combine to get affineSpan ℝ s ≤ affineSpan ℝ t
+  have h3 : affineSpan ℝ s ≤ affineSpan ℝ t := h2 ▸ h1
+  -- Apply direction_le to get direction ordering
+  have h4 : (affineSpan ℝ s).direction ≤ (affineSpan ℝ t).direction :=
+    AffineSubspace.direction_le h3
+  -- Use finrank monotonicity on submodules
+  -- affineDim is defined as Module.finrank of the direction
+  simp only [affineDim]
+  exact_mod_cast Submodule.finrank_mono h4
 
 /-- If F and G are geometric faces with F ⊂ G and dim F < dim G, then there exists
 a vertex v in G that is not in the affine span of F.
