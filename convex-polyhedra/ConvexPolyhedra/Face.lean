@@ -3,193 +3,192 @@ Copyright (c) 2025 Jesse Alama. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Jesse Alama
 -/
-import ConvexPolyhedra.Basic
-import Mathlib.Order.Lattice
-import Mathlib.LinearAlgebra.AffineSpace.AffineSubspace.Defs
-import Mathlib.LinearAlgebra.AffineSpace.FiniteDimensional
+import ConvexPolyhedra.Polyhedron
+import Mathlib.Analysis.Convex.Hull
+import Mathlib.Analysis.Convex.Basic
+import Mathlib.Analysis.Convex.Topology
+import Mathlib.Analysis.Convex.Extreme
+import Mathlib.Analysis.Convex.Exposed
+import Mathlib.Analysis.InnerProductSpace.Basic
+import Mathlib.Analysis.InnerProductSpace.PiL2
+import Mathlib.Analysis.Normed.Module.Convex
 import Mathlib.LinearAlgebra.Dimension.Finrank
+import Mathlib.LinearAlgebra.FiniteDimensional.Defs
+import Mathlib.LinearAlgebra.AffineSpace.FiniteDimensional
+import Mathlib.LinearAlgebra.AffineSpace.AffineSubspace.Basic
+import Mathlib.Algebra.Homology.HomologicalComplex
+import Mathlib.Data.Finsupp.Defs
+import Mathlib.Data.ZMod.Defs
+import Mathlib.Order.Defs.PartialOrder
+import Mathlib.Order.Lattice
+import Mathlib.Order.Grade
+import Mathlib.Order.RelSeries
+import Mathlib.Order.Cover
 
 /-!
 # Faces of Convex Polyhedra
 
-This file defines the face structure of convex polyhedra and shows it forms a lattice.
-
-A face of a polyhedron is the intersection of the polyhedron with a supporting hyperplane.
-The faces form a lattice under inclusion.
+This file defines faces of convex polyhedra using the V-representation.
+A face is an exposed face: a subset obtained by maximizing a linear functional.
 
 ## Main definitions
 
-* `HPolyhedron.Face` - A face of a polyhedron
-* `HPolyhedron.faceDim` - Dimension of a face
-* `HPolyhedron.vertices` - The 0-dimensional faces (vertices)
-* `HPolyhedron.edges` - The 1-dimensional faces (edges)
-* `HPolyhedron.facets` - The (d-1)-dimensional faces where d is the polyhedron dimension
+* `ConvexPolyhedron.Face` - A face structure with supporting functional
+* `ConvexPolyhedron.Face.toSet` - The underlying set of a face
+* `ConvexPolyhedron.Face.dim` - Affine dimension of a face
+* `ConvexPolyhedron.faces` - Faces of a given dimension
+* `ConvexPolyhedron.incident` - Incidence relation between faces
 
 ## Main results
 
-* `HPolyhedron.face_lattice` - The faces form a lattice under inclusion
+* `faces_finite` - Finitely many faces in each dimension (to be proven)
+* Incidence properties: irreflexive, asymmetric
+
+## Implementation notes
+
+For V-representation, a face is characterized by a supporting hyperplane that achieves
+its maximum on the polyhedron exactly at that face.
 
 -/
 
-open Set Finset Module
+open Set Finset
 open scoped RealInnerProductSpace
 
-variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
 
-namespace HPolyhedron
+namespace ConvexPolyhedron
 
-variable (P : HPolyhedron E)
+section Faces
 
-/-- A half-space supports a polyhedron if all points of the polyhedron satisfy the inequality
-    and at least one point achieves equality -/
-def IsSupporting (P : HPolyhedron E) (h : HalfSpace E) : Prop :=
-  P.toSet ⊆ h.toSet ∧ (P.toSet ∩ h.boundary).Nonempty
+/-- A face of a polyhedron is an exposed face: a subset obtained by maximizing a linear functional.
 
-/-- A subset F is a face of polyhedron P if it's the intersection of P with the boundary
-    of some supporting half-space -/
-def IsFace (P : HPolyhedron E) (F : Set E) : Prop :=
-  ∃ h : HalfSpace E, IsSupporting P h ∧ F = P.toSet ∩ h.boundary
+For V-representation, a face is characterized by a supporting hyperplane that achieves
+its maximum on the polyhedron exactly at that face. -/
+structure Face (P : ConvexPolyhedron E) where
+  /-- The supporting linear functional defining this face -/
+  support : E →L[ℝ] ℝ
+  /-- The vertices of the polyhedron that maximize the supporting functional -/
+  vertices : Finset E
+  /-- These vertices are a subset of the polyhedron's vertices -/
+  subset : vertices ⊆ P.vertices
+  /-- These are exactly the vertices where the maximum is attained -/
+  is_maximal : ∀ v ∈ P.vertices, v ∈ vertices ↔
+    (∀ w ∈ P.vertices, support v ≥ support w)
 
-section FiniteDimensional
+namespace Face
 
-variable [FiniteDimensional ℝ E]
+variable {P : ConvexPolyhedron E}
 
-/-- The dimension of a face (as an affine subspace) -/
-noncomputable def faceDim (F : Set E) (_hF : IsFace P F) : ℕ :=
-  finrank ℝ (affineSpan ℝ F).direction
+/-- The underlying set of a face (convex hull of its vertices) -/
+def toSet (F : Face P) : Set E :=
+  convexHull ℝ (F.vertices : Set E)
 
-/-- A face is a vertex if it's 0-dimensional -/
-def IsVertex (F : Set E) : Prop :=
-  IsFace P F ∧ ∃ hF : IsFace P F, faceDim P F hF = 0
+/-- A face is convex -/
+theorem convex (F : Face P) : Convex ℝ F.toSet :=
+  convex_convexHull ℝ _
 
-/-- A face is an edge if it's 1-dimensional -/
-def IsEdge (F : Set E) : Prop :=
-  IsFace P F ∧ ∃ hF : IsFace P F, faceDim P F hF = 1
+/-- A face is contained in the polyhedron -/
+theorem subset_polyhedron (F : Face P) : F.toSet ⊆ (P : Set E) :=
+  convexHull_mono (by exact_mod_cast F.subset)
 
-/-- A face is a facet if it has dimension dim(P) - 1 -/
-def IsFacet (F : Set E) : Prop :=
-  IsFace P F ∧ ∃ hF : IsFace P F, faceDim P F hF = finrank ℝ E - 1
+/-- The affine dimension of a face -/
+noncomputable def dim (F : Face P) : ℤ :=
+  affineDim ℝ F.toSet
 
-end FiniteDimensional
+/-- Two faces are incident if one is contained in the other -/
+def incident (F G : Face P) : Prop :=
+  F.toSet ⊆ G.toSet ∨ G.toSet ⊆ F.toSet
 
-/-- A face of the polyhedron, bundled with its proof -/
-structure Face where
-  /-- The underlying set of points -/
-  carrier : Set E
-  /-- Proof that this is a face -/
-  is_face : IsFace P carrier
+end Face
 
-/-- The dimension of a bundled face -/
-noncomputable def Face.dim [FiniteDimensional ℝ E] (F : Face P) : ℕ :=
-  faceDim P F.carrier F.is_face
+/-- Faces of a given dimension -/
+def faces (P : ConvexPolyhedron E) (k : ℕ) : Set (Face P) :=
+  {F : Face P | F.dim = k}
 
-/-- Coercion from Face to Set E -/
-instance : CoeOut (Face P) (Set E) where
-  coe F := F.carrier
+/-- Simplified incidence relation: F is incident to G if F is a facet of G.
+This is the relation we use in the boundary map: for each k-face G, we sum over
+all (k-1)-faces F that are incident to it.
 
-/-- Two faces are equal if their carriers are equal -/
-@[ext]
-lemma Face.ext {F G : Face P} (h : F.carrier = G.carrier) : F = G := by
-  cases F; cases G; congr
+Note: This is directional - F is incident to G means F ⊆ G and dim F = dim G - 1. -/
+noncomputable def incident (P : ConvexPolyhedron E) (F G : Face P) : Bool :=
+  -- Check if F is a proper face of G with dimension exactly one less
+  (F.dim + 1 == G.dim) && @decide (F.toSet ⊆ G.toSet) (Classical.dec _)
 
-section FiniteDimensional
-variable [FiniteDimensional ℝ E]
-
-/-- A k-face is a face with dimension k -/
-structure KFace (k : ℤ) extends Face P where
-  /-- Proof that the dimension equals k -/
-  dim_eq : (toFace.dim : ℤ) = k
-
-/-- Coercion from KFace to Set E -/
-instance (k : ℤ) : CoeOut (KFace P k) (Set E) where
-  coe F := F.carrier
-
-/-- The type of k-faces is finite for each k -/
-noncomputable instance kface_finite (k : ℤ) : Fintype (KFace P k) := by
-  -- Each k-face corresponds to a subset of half-spaces where equality holds
-  -- Since P.halfSpaces is finite, there are finitely many such faces
-  sorry
-
-/-- Convert between KFace type and faces_dim membership -/
-lemma kface_iff_mem_faces_dim (k : ℤ) (F : Set E) :
-    (∃ kF : KFace P k, kF.carrier = F) ↔
-    (IsFace P F ∧ ∃ hF : IsFace P F, (faceDim P F hF : ℤ) = k) := by
+/-- Incidence is true iff the dimension condition holds and F ⊆ G -/
+theorem incident_iff (P : ConvexPolyhedron E) (F G : Face P) :
+    P.incident F G ↔ (F.dim + 1 = G.dim ∧ F.toSet ⊆ G.toSet) := by
+  unfold incident
+  simp only [Bool.and_eq_true, beq_iff_eq]
   constructor
-  · intro ⟨kF, hF⟩
-    rw [← hF]
-    exact ⟨kF.is_face, kF.is_face, kF.dim_eq⟩
-  · intro ⟨hF, _, hdim⟩
-    use ⟨⟨F, hF⟩, hdim⟩
+  · intro ⟨h1, h2⟩
+    exact ⟨h1, @of_decide_eq_true (F.toSet ⊆ G.toSet) (Classical.dec _) h2⟩
+  · intro ⟨h1, h2⟩
+    exact ⟨h1, @decide_eq_true (F.toSet ⊆ G.toSet) (Classical.dec _) h2⟩
 
-/-- Incidence between faces using the type-based approach -/
-def Face.incident (F G : Face P) : Prop :=
-  G.carrier ⊆ F.carrier ∧ G.dim + 1 = F.dim
+/-- If F is incident to G, then F ⊆ G -/
+theorem incident_subset (P : ConvexPolyhedron E) {F G : Face P} (h : P.incident F G) :
+    F.toSet ⊆ G.toSet := by
+  rw [incident_iff] at h
+  exact h.2
 
-/-- Check if a face contains another -/
-def Face.contains (F G : Face P) : Prop :=
-  G.carrier ⊆ F.carrier
+/-- If F is incident to G, then dim F = dim G - 1 -/
+theorem incident_dim (P : ConvexPolyhedron E) {F G : Face P} (h : P.incident F G) :
+    F.dim + 1 = G.dim := by
+  rw [incident_iff] at h
+  exact h.1
 
-/-- No k-faces exist for k < 0 -/
-lemma KFace.empty_of_neg (k : ℤ) (hk : k < 0) : IsEmpty (KFace P k) := by
-  constructor
-  intro kF
-  have : (kF.dim : ℤ) ≥ 0 := Int.natCast_nonneg _
-  rw [kF.dim_eq] at this
+/-- Incidence is irreflexive: a face is not incident to itself -/
+theorem incident_irrefl (P : ConvexPolyhedron E) (F : Face P) :
+    ¬P.incident F F := by
+  intro h
+  have := incident_dim P h
   omega
 
-/-- No k-faces exist for k > dim(E) -/
-lemma KFace.empty_of_large (k : ℤ) (hk : k > finrank ℝ E) : IsEmpty (KFace P k) := by
+/-- Incidence is asymmetric: if F is incident to G, then G is not incident to F -/
+theorem incident_asymm (P : ConvexPolyhedron E) {F G : Face P}
+    (h : P.incident F G) : ¬P.incident G F := by
+  intro h'
+  have hFG := incident_dim P h
+  have hGF := incident_dim P h'
+  omega
+
+/-- The k-dimensional faces form a finite set (key theorem).
+
+## Proof Strategy
+
+Each face is determined by which subset of vertices maximizes a linear functional.
+Since P.vertices is finite, there are only finitely many possible vertex subsets.
+
+## What's Needed for Complete Proof
+
+1. **Face lattice theory**: Faces of a convex polytope form a finite lattice
+2. **Counting argument**: For each dimension k, only finitely many vertex subsets
+   can form k-dimensional faces (bounded by affine independence constraints)
+3. **Exposed face finiteness**: Mathlib may have results about finite face structures
+   for polytopes (see `Mathlib.Analysis.Convex.Exposed`)
+
+## Current Status
+
+This is left as sorry for now. The geometric fact is standard: a polytope defined as
+the convex hull of finitely many points has finitely many faces of each dimension.
+The full formalization would benefit from:
+- Connecting to Mathlib's exposed face theory
+- Developing face lattice structure
+- Using combinatorial bounds on faces (e.g., upper bound theorem) -/
+theorem faces_finite (P : ConvexPolyhedron E) (k : ℕ) : (P.faces k).Finite := by
   sorry
 
-end FiniteDimensional
+/-- Incidence relation: a (k-1)-face is on the boundary of a k-face -/
+def incidentFaces (P : ConvexPolyhedron E) (k : ℕ) (F : Face P) (G : Face P) : Prop :=
+  F.dim = k - 1 ∧ G.dim = k ∧ F.toSet ⊆ G.toSet
 
-/-- The set of all faces of a polyhedron -/
-def faces (P : HPolyhedron E) : Set (Set E) :=
-  {F | IsFace P F}
+/-- Decidable instance for face incidence (for computation).
+This requires checking dimension equality and set containment.
+For now, we use Classical.dec since the full decidability proof is complex. -/
+noncomputable instance (P : ConvexPolyhedron E) (k : ℕ) (F G : Face P) :
+    Decidable (incidentFaces P k F G) :=
+  Classical.dec _
 
-section FiniteDimensional
+end Faces
 
-variable [FiniteDimensional ℝ E]
-
-/-- The set of all vertices of a polyhedron -/
-def vertices : Set (Set E) :=
-  {F | IsVertex P F}
-
-/-- The set of all edges of a polyhedron -/
-def edges : Set (Set E) :=
-  {F | IsEdge P F}
-
-/-- The set of all facets of a polyhedron -/
-def facets : Set (Set E) :=
-  {F | IsFacet P F}
-
-end FiniteDimensional
-
-/-- Every face is contained in the polyhedron -/
-lemma face_subset_polyhedron (P : HPolyhedron E) {F : Set E} (hF : IsFace P F) :
-    F ⊆ P.toSet := by
-  obtain ⟨h, ⟨_, rfl⟩⟩ := hF
-  exact Set.inter_subset_left
-
-/-- The polyhedron itself is a face (via trivial supporting halfspace) -/
-lemma polyhedron_is_face (P : HPolyhedron E) : IsFace P P.toSet := sorry
-
-/-- The empty set is a face -/
-lemma empty_is_face (P : HPolyhedron E) : IsFace P ∅ := sorry
-
-/-- The intersection of two faces is a face -/
-lemma face_inter_face (P : HPolyhedron E) {F G : Set E} (hF : IsFace P F) (hG : IsFace P G) :
-    IsFace P (F ∩ G) := sorry
-
-/-- Faces are closed under intersection -/
-lemma faces_closed_under_inter :
-    ∀ F ∈ faces P, ∀ G ∈ faces P, F ∩ G ∈ faces P := by
-  intros F hF G hG
-  exact face_inter_face P hF hG
-
-/-- A face is determined by which inequalities are tight -/
-lemma face_tight_inequalities (P : HPolyhedron E) {F : Set E} (hF : IsFace P F) :
-    ∃ I ⊆ P.halfSpaces,
-      F = {x ∈ P.toSet | ∀ i ∈ I, ⟪(i : HalfSpace E).normal, x⟫ = i.bound} := sorry
-
-end HPolyhedron
+end ConvexPolyhedron
