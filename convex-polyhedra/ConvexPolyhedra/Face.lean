@@ -164,6 +164,40 @@ theorem support_const_on_face (F : Face P) (hne : F.vertices.Nonempty) :
       = F.support v₀ := hx_eq
     _ = F.support v := (h_const v hv).symm
 
+/-- Weighted average lemma: If a weighted sum of values equals an upper bound M,
+and all values are ≤ M, then all values with positive weight must equal M.
+
+This is a key technical lemma for proving the reverse direction of isExposed. -/
+lemma weighted_sum_eq_max_of_le {ι : Type*} (s : Finset ι) (w : ι → ℝ) (a : ι → ℝ) (M : ℝ)
+    (hw_nonneg : ∀ i ∈ s, 0 ≤ w i)
+    (hw_sum : ∑ i ∈ s, w i = 1)
+    (ha_le : ∀ i ∈ s, a i ≤ M)
+    (h_sum_eq : ∑ i ∈ s, w i * a i = M) :
+    ∀ i ∈ s, w i > 0 → a i = M := by
+  intro i hi hwi_pos
+  -- Proof by contradiction
+  by_contra h_ne
+  -- If a i < M (since a i ≤ M and a i ≠ M)
+  have hai_lt : a i < M := by
+    exact lt_of_le_of_ne (ha_le i hi) h_ne
+  -- Then the weighted sum is strictly less than M
+  have : ∑ j ∈  s, w j * a j < M := by
+    calc ∑ j ∈  s, w j * a j
+        < ∑ j ∈  s, w j * M := by
+            -- Apply strict inequality for the sum
+            apply Finset.sum_lt_sum
+            · -- All terms ≤ bound
+              intro j hj
+              exact mul_le_mul_of_nonneg_left (ha_le j hj) (hw_nonneg j hj)
+            · -- Strict inequality for at least one term
+              use i, hi
+              exact mul_lt_mul_of_pos_left hai_lt hwi_pos
+      _ = (∑ j ∈  s, w j) * M := by rw [← Finset.sum_mul]
+      _ = 1 * M := by rw [hw_sum]
+      _ = M := one_mul M
+  -- But this contradicts h_sum_eq
+  linarith
+
 /-- Every face of a polytope is an exposed face.
 
 This connects our `Face` structure to Mathlib's `IsExposed` predicate from
@@ -303,7 +337,68 @@ theorem isExposed (F : Face P) : IsExposed ℝ (P : Set E) F.toSet := by
     -- POTENTIAL CHALLENGES:
     -- - The weighted average lemma (Step 4) is the key technical piece
     -- - May need to work with Finsupp or explicit finite sums
-    sorry
+
+    -- Step 1: Express x as convex combination of P.vertices
+    have hx_hull : x ∈ convexHull ℝ (P.vertices : Set E) := hx_in_P
+    rw [Finset.mem_convexHull'] at hx_hull
+    obtain ⟨w, hw_nonneg, hw_sum, hx_eq⟩ := hx_hull
+
+    -- Step 2: Apply linearity of F.support
+    have h_linear : F.support x = ∑ v ∈ P.vertices, w v * F.support v := by
+      calc F.support x
+          = F.support (∑ v ∈ P.vertices, w v • v) := by rw [hx_eq]
+        _ = ∑ v ∈ P.vertices, F.support (w v • v) := by rw [map_sum]
+        _ = ∑ v ∈ P.vertices, w v * F.support v := by
+            congr 1
+            ext v
+            rw [F.support.map_smul]
+            rfl
+
+    -- Step 3: Each vertex satisfies F.support v ≤ F.support x
+    have hv_le : ∀ v ∈ P.vertices, F.support v ≤ F.support x := by
+      intro v hv
+      have : v ∈ (P : Set E) := subset_convexHull ℝ _ hv
+      exact hx_max v this
+
+    -- Step 4: Apply weighted average lemma
+    have hv_eq : ∀ v ∈ P.vertices, w v > 0 → F.support v = F.support x := by
+      intro v hv hwv_pos
+      exact weighted_sum_eq_max_of_le P.vertices w (fun v => F.support v) (F.support x)
+        hw_nonneg hw_sum hv_le h_linear.symm v hv hwv_pos
+
+    -- Step 5: Maximizing vertices are in F.vertices
+    have hv_in_F : ∀ v ∈ P.vertices, w v > 0 → v ∈ F.vertices := by
+      intro v hv hwv_pos
+      have hv_max : ∀ u ∈ P.vertices, F.support u ≤ F.support v := by
+        intro u hu
+        calc F.support u
+            ≤ F.support x := hv_le u hu
+          _ = F.support v := (hv_eq v hv hwv_pos).symm
+      exact (F.is_maximal v hv).mpr hv_max
+
+    -- Step 6: x is convex combination of F.vertices
+    rw [Face.toSet, Finset.mem_convexHull']
+    use w
+    refine ⟨?_, ?_, ?_⟩
+    · intro v hv
+      exact hw_nonneg v (F.subset hv)
+    · -- Sum of weights on F.vertices equals 1
+      have h_sum : ∑ y ∈ F.vertices, w y = ∑ y ∈ P.vertices, w y := by
+        apply Finset.sum_subset F.subset
+        intro v hv_P hv_not_F
+        have : ¬(w v > 0) := fun h_pos => hv_not_F (hv_in_F v hv_P h_pos)
+        push_neg at this
+        exact le_antisymm this (hw_nonneg v hv_P)
+      rw [h_sum, hw_sum]
+    · -- Sum of weighted points on F.vertices equals x
+      have h_sum : ∑ y ∈ F.vertices, w y • y = ∑ y ∈ P.vertices, w y • y := by
+        apply Finset.sum_subset F.subset
+        intro v hv_P hv_not_F
+        have : ¬(w v > 0) := fun h_pos => hv_not_F (hv_in_F v hv_P h_pos)
+        push_neg at this
+        have : w v = 0 := le_antisymm this (hw_nonneg v hv_P)
+        simp [this]
+      rw [h_sum, hx_eq]
 
 /-- The affine dimension of a face -/
 noncomputable def dim (F : Face P) : ℤ :=
