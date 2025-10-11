@@ -224,18 +224,36 @@ theorem isExposed (F : Face P) : IsExposed ℝ (P : Set E) F.toSet := by
       -- we have F.support y ≤ F.support v = F.support x
       calc F.support y
           ≤ F.support v := by
-              -- STANDARD LEMMA NEEDED: For a continuous linear functional φ on a finite set S,
-              -- sup{φ(x) | x ∈ convexHull S} = sup{φ(s) | s ∈ S}
-              --
-              -- Proof idea: If y = Σᵢ λᵢ wᵢ where wᵢ ∈ P.vertices, Σᵢ λᵢ = 1, λᵢ ≥ 0, then
-              -- F.support y = F.support (Σᵢ λᵢ wᵢ)      (by definition)
-              --             = Σᵢ λᵢ (F.support wᵢ)        (by linearity)
-              --             ≤ Σᵢ λᵢ (F.support v)         (since each F.support wᵢ ≤ F.support v)
-              --             = (F.support v) · (Σᵢ λᵢ)     (factoring out)
-              --             = F.support v                   (since Σᵢ λᵢ = 1)
-              --
-              -- This is the KEY technical lemma for the entire isExposed proof!
-              sorry
+              -- KEY: Linear maps are convex functions, so the max on convexHull
+              -- equals max on vertices. Use ConvexOn.le_sup_of_mem_convexHull to
+              -- show F.support y ≤ sup (F.support on P.vertices)
+
+              -- y ∈ P means y ∈ convexHull P.vertices (by the SetLike instance)
+              have hy_hull : y ∈ convexHull ℝ (P.vertices : Set E) := hy
+
+              -- Linear maps are convex on any convex set
+              have h_convex : ConvexOn ℝ Set.univ F.support.toLinearMap :=
+                F.support.toLinearMap.convexOn convex_univ
+
+              -- Apply ConvexOn.le_sup_of_mem_convexHull
+              have h_le_sup := h_convex.le_sup_of_mem_convexHull
+                (Set.subset_univ _) hy_hull
+
+              -- P.vertices is nonempty (from P.nonempty)
+              have hP_nonempty : P.vertices.Nonempty := P.nonempty
+
+              calc F.support y
+                  ≤ P.vertices.sup' hP_nonempty F.support.toLinearMap := h_le_sup
+                _ = F.support v := by
+                    -- Show equality by antisymmetry
+                    apply le_antisymm
+                    · -- sup' ≤ F.support v: all vertices ≤ F.support v
+                      apply Finset.sup'_le
+                      intro w hw
+                      exact hv_max w hw
+                    · -- F.support v ≤ sup': v is one of the vertices
+                      apply Finset.le_sup'
+                      exact F.subset hv
         _ = F.support x := hx_eq.symm
   · -- Reverse direction: x ∈ P and x maximizes F.support → x ∈ F.toSet
     intro ⟨hx_in_P, hx_max⟩
