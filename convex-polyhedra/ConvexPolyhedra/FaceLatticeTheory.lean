@@ -85,6 +85,16 @@ theorem geometric_dim_lt_of_ssubset {P : ConvexPolyhedron E} {F G : GeometricFac
 The key geometric construction showing that we can find faces of intermediate dimension.
 -/
 
+/-- Affine dimension is monotone with respect to inclusion in affine spans.
+
+If s ⊆ affineSpan ℝ t, then affineDim ℝ s ≤ affineDim ℝ t.
+
+This follows from the fact that affineSpan is monotone and idempotent, combined with
+the relationship between affine dimension and the dimension of the direction submodule. -/
+theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan ℝ t) :
+    affineDim ℝ s ≤ affineDim ℝ t := by
+  sorry
+
 /-- If F and G are geometric faces with F ⊂ G and dim F < dim G, then there exists
 a vertex v in G that is not in the affine span of F.
 
@@ -127,13 +137,7 @@ theorem exists_vertex_not_in_affineSpan {P : ConvexPolyhedron E}
   have hF_span : F.toSet ⊆ affineSpan ℝ F.toSet := subset_affineSpan ℝ F.toSet
 
   -- Since G.toSet ⊆ affineSpan ℝ F.toSet, we get dimension constraint
-  have h_dim_le : G.dim ≤ F.dim := by
-    -- Key lemma needed: If s ⊆ affineSpan ℝ t, then affineDim s ≤ affineDim t
-    -- This follows from:
-    --   1. affineSpan ℝ s ⊆ affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t (monotonicity + idempotence)
-    --   2. affineDim s = finrank (direction (affineSpan ℝ s))
-    --   3. Submodule inclusion implies finrank inequality
-    sorry
+  have h_dim_le : G.dim ≤ F.dim := affineDim_le_of_subset_affineSpan h_subset
 
   -- Contradiction with hdim : F.dim < G.dim
   omega
