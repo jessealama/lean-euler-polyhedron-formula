@@ -133,11 +133,40 @@ theorem exists_intermediate_geometric_face {P : ConvexPolyhedron E}
 Geometric faces are finite in each dimension (needed for counting).
 -/
 
-/-- The set of geometric k-dimensional faces is finite. -/
+/-- The set of geometric k-dimensional faces is finite.
+
+Proof strategy: The map F ↦ F.toSet injects {F : GeometricFace P | F.dim = k}
+into the finite set {s : Set E | ∃ F : Face P, F.dim = k ∧ s = F.toSet}. -/
 theorem geometric_k_faces_finite (P : ConvexPolyhedron E) (k : ℤ) :
     {F : GeometricFace P | F.dim = k}.Finite := by
   have h_sets_finite := geometric_faces_finite P k
-  sorry
+
+  -- Step 1: toSet is injective on GeometricFace by subtype equality
+  have h_inj : Set.InjOn GeometricFace.toSet {F : GeometricFace P | F.dim = k} := by
+    intros F _hF G _hG hFG
+    -- Two GeometricFaces are equal iff their underlying sets are equal
+    exact Subtype.ext hFG
+
+  -- Step 2: Image lands in the finite set from geometric_faces_finite
+  have h_image_subset : (GeometricFace.toSet '' {F : GeometricFace P | F.dim = k}) ⊆
+      {s : Set E | ∃ F : Face P, F.dim = k ∧ s = F.toSet} := by
+    intro s hs
+    obtain ⟨F, hF, rfl⟩ := hs
+    -- Use exists_face_witness to get a Face with the same underlying set
+    obtain ⟨F', hF'_eq⟩ := GeometricFace.exists_face_witness F
+    use F'
+    constructor
+    · -- F'.dim = affineDim ℝ F'.toSet = affineDim ℝ F.toSet = F.dim = k
+      show F'.dim = k
+      calc F'.dim
+          = affineDim ℝ F'.toSet := rfl
+        _ = affineDim ℝ F.toSet := by rw [hF'_eq]
+        _ = F.dim := rfl
+        _ = k := hF
+    · exact hF'_eq.symm
+
+  -- Step 3: Apply finiteness via the injection
+  exact (h_sets_finite.subset h_image_subset).of_finite_image h_inj
 
 /-!
 ### Diamond Property
