@@ -528,30 +528,6 @@ theorem geometric_faces_finite (P : ConvexPolyhedron E) (k : ℤ) :
 
   exact h_target_finite.subset h_subset
 
-/-- DEPRECATED: This theorem statement is incorrect.
-
-The issue: This tries to prove that (P.faces k : Set (Face P)) is finite, but this set is
-actually INFINITE for most polyhedra. The Face type includes the supporting functional as
-structural data, and infinitely many functionals can expose the same geometric face.
-
-Example: For a triangle with edge face S = {(1,0), (0,1)}, the functionals l(x,y) = c(x+y)
-for all c > 0 all maximize exactly on S, giving uncountably many Face structures.
-
-The CORRECT theorem is `geometric_faces_finite`, which counts geometric faces (sets in E)
-rather than Face structures. That theorem is provable and is what we actually need for
-Euler characteristic computations.
-
-This theorem is left as sorry to document the architectural issue. In practice, use
-`geometric_faces_finite` for any finiteness reasoning about faces. -/
-theorem faces_finite (P : ConvexPolyhedron E) (k : ℕ) : (P.faces k).Finite := by
-  -- This statement is false in general. The set {F : Face P | F.dim = k} includes
-  -- all Face structures with dimension k, but there are infinitely many such structures
-  -- (one for each supporting functional).
-  --
-  -- To prove finiteness of faces, use geometric_faces_finite instead, which counts
-  -- the finite set of geometric faces: {F.toSet | F : Face P, F.dim = k}
-  sorry
-
 /-- Incidence relation: a (k-1)-face is on the boundary of a k-face -/
 def incidentFaces (P : ConvexPolyhedron E) (k : ℕ) (F : Face P) (G : Face P) : Prop :=
   F.dim = k - 1 ∧ G.dim = k ∧ F.toSet ⊆ G.toSet
