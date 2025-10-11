@@ -51,6 +51,24 @@ variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDim
 namespace ConvexPolyhedron
 
 /-!
+### Lattice Structure
+
+Geometric faces form a partial order (and later a lattice) under set inclusion.
+-/
+
+/-- Partial order on geometric faces by set inclusion.
+
+This is well-defined because GeometricFace provides canonical representatives:
+two geometric faces are equal iff their underlying sets are equal. -/
+instance {P : ConvexPolyhedron E} : PartialOrder (GeometricFace P) where
+  le F G := F.toSet ⊆ G.toSet
+  le_refl F := Set.Subset.rfl
+  le_trans F G H := Set.Subset.trans
+  le_antisymm F G hFG hGF := by
+    have : F.val = G.val := Set.Subset.antisymm hFG hGF
+    exact Subtype.ext this
+
+/-!
 ### Basic Dimension Properties
 
 These establish that dimension is monotone with respect to face containment.

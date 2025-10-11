@@ -551,15 +551,6 @@ instance : CoeOut (GeometricFace P) (Set E) where
 noncomputable def dim (F : GeometricFace P) : ℤ :=
   affineDim ℝ F.toSet
 
-/-- Partial order on geometric faces by set inclusion -/
-instance : PartialOrder (GeometricFace P) where
-  le F G := F.toSet ⊆ G.toSet
-  le_refl F := Set.Subset.rfl
-  le_trans F G H := Set.Subset.trans
-  le_antisymm F G hFG hGF := by
-    have : F.val = G.val := Set.Subset.antisymm hFG hGF
-    exact Subtype.ext this
-
 /-- Convert a Face to a GeometricFace -/
 noncomputable def ofFace (F : Face P) (hne : F.toSet.Nonempty) : GeometricFace P :=
   ⟨F.toSet, F.isExposed, hne⟩
