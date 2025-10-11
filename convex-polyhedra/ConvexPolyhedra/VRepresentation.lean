@@ -5,7 +5,7 @@ Authors: Jesse Alama
 -/
 import ConvexPolyhedra.Polyhedron
 import ConvexPolyhedra.Face
-import ConvexPolyhedra.FaceLattice
+import ConvexPolyhedra.FaceLatticeTheory
 import ConvexPolyhedra.ChainComplex
 import ConvexPolyhedra.Euler3D
 

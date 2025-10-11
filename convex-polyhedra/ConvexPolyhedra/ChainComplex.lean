@@ -3,7 +3,7 @@ Copyright (c) 2025 Jesse Alama. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Jesse Alama
 -/
-import ConvexPolyhedra.FaceLattice
+import ConvexPolyhedra.FaceLatticeTheory
 import Mathlib.Analysis.Convex.Hull
 import Mathlib.Analysis.Convex.Basic
 import Mathlib.Analysis.Convex.Topology
