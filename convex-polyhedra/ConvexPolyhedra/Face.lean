@@ -91,6 +91,31 @@ theorem convex (F : Face P) : Convex ℝ F.toSet :=
 theorem subset_polyhedron (F : Face P) : F.toSet ⊆ (P : Set E) :=
   convexHull_mono (by exact_mod_cast F.subset)
 
+/-- Every face of a polytope is an exposed face.
+
+This connects our `Face` structure to Mathlib's `IsExposed` predicate from
+`Analysis.Convex.Exposed`. Our Face structure is defined to be exposed by
+construction (via the supporting functional), but this theorem makes the
+connection explicit.
+
+The key insight: For polytopes (convex hull of finitely many points), every
+face is exposed. This is a fundamental theorem in polytope theory that
+distinguishes polytopes from general convex sets, where faces may exist that
+are not exposed.
+
+This theorem is crucial for leveraging Mathlib's exposed face theory in our
+proofs. -/
+theorem isExposed (F : Face P) : IsExposed ℝ (P : Set E) F.toSet := by
+  -- IsExposed requires: B.Nonempty → ∃ l, B = {x | x ∈ A ∧ ∀ y ∈ A, l y ≤ l x}
+  intro h_nonempty
+  use F.support
+  -- Need to show: F.toSet = {x | x ∈ P ∧ ∀ y ∈ P, F.support y ≤ F.support x}
+  -- This follows from the fact that:
+  -- - F.toSet = convexHull ℝ (F.vertices : Set E)
+  -- - F.vertices are exactly the vertices where F.support achieves its maximum (by is_maximal)
+  -- - Points in convexHull of maximizers also achieve the maximum for linear functionals
+  sorry
+
 /-- The affine dimension of a face -/
 noncomputable def dim (F : Face P) : ℤ :=
   affineDim ℝ F.toSet
