@@ -115,10 +115,54 @@ all points in the convex hull also achieve M. -/
 theorem support_const_on_face (F : Face P) (hne : F.vertices.Nonempty) :
     ∀ x ∈ F.toSet, ∀ v ∈ F.vertices, F.support x = F.support v := by
   intro x hx v hv
-  -- The proof requires showing that linear functionals preserve the constant value
-  -- on convex combinations. This follows from:
-  -- If x = Σᵢ λᵢ vᵢ where all vᵢ achieve value M, then F.support x = Σᵢ λᵢ M = M
-  sorry
+  -- Strategy: Use LinearMap.image_convexHull
+  -- Since F.support is constant on F.vertices, F.support '' F.vertices = {M}
+  -- So F.support '' convexHull F.vertices = convexHull {M} = {M}
+
+  -- Get the constant value M that all vertices achieve
+  obtain ⟨v₀, hv₀⟩ := hne
+
+  -- All vertices achieve the same value as v₀
+  have h_const : ∀ w ∈ F.vertices, F.support w = F.support v₀ :=
+    fun w hw => F.support_const_on_face_vertices w hw v₀ hv₀
+
+  -- Therefore (F.support : E → ℝ) '' F.vertices = {F.support v₀}
+  have h_image : (F.support : E → ℝ) '' (F.vertices : Set E) = {F.support v₀} := by
+    ext y
+    simp only [Set.mem_image, Set.mem_singleton_iff]
+    constructor
+    · rintro ⟨w, hw, rfl⟩
+      exact h_const w hw
+    · intro hy
+      use v₀, hv₀
+      exact hy.symm
+
+  -- Apply LinearMap.image_convexHull to get the image of the convex hull
+  have h_hull : (F.support : E → ℝ) '' F.toSet = convexHull ℝ {F.support v₀} := by
+    calc (F.support : E → ℝ) '' F.toSet
+        = (F.support : E → ℝ) '' convexHull ℝ (F.vertices : Set E) := rfl
+      _ = F.support.toLinearMap '' convexHull ℝ (F.vertices : Set E) := rfl
+      _ = convexHull ℝ (F.support.toLinearMap '' (F.vertices : Set E)) :=
+            F.support.toLinearMap.image_convexHull _
+      _ = convexHull ℝ ((F.support : E → ℝ) '' (F.vertices : Set E)) := rfl
+      _ = convexHull ℝ {F.support v₀} := by rw [h_image]
+
+  -- convexHull of singleton is the singleton
+  rw [convexHull_singleton] at h_hull
+
+  -- Since x ∈ F.toSet, F.support x ∈ {F.support v₀}
+  have hx_eq : F.support x = F.support v₀ := by
+    -- F.support x ∈ (F.support : E → ℝ) '' F.toSet = {F.support v₀}
+    have mem : F.support x ∈ (F.support : E → ℝ) '' F.toSet :=
+      Set.mem_image_of_mem (F.support : E → ℝ) hx
+    rw [h_hull] at mem
+    -- Now mem : F.support x ∈ {F.support v₀}
+    exact Set.mem_singleton_iff.mp mem
+
+  -- And F.support v = F.support v₀ (since all vertices achieve the same value)
+  calc F.support x
+      = F.support v₀ := hx_eq
+    _ = F.support v := (h_const v hv).symm
 
 /-- Every face of a polytope is an exposed face.
 
