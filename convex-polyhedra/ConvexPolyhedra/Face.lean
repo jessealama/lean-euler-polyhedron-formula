@@ -528,6 +528,48 @@ theorem geometric_faces_finite (P : ConvexPolyhedron E) (k : ℤ) :
 
   exact h_target_finite.subset h_subset
 
+/-- A geometric face is an exposed face of a polyhedron, represented as a set.
+This type quotients out the choice of supporting functional, giving a canonical
+representation for each geometric object.
+
+This is the correct type for lattice theory: geometric faces form a graded lattice,
+while Face structures (which include the functional) have non-unique representations. -/
+def GeometricFace (P : ConvexPolyhedron E) : Type _ :=
+  {s : Set E // IsExposed ℝ (P : Set E) s ∧ s.Nonempty}
+
+namespace GeometricFace
+
+variable {P : ConvexPolyhedron E}
+
+/-- Extract the underlying set from a geometric face -/
+def toSet (F : GeometricFace P) : Set E := F.val
+
+instance : CoeOut (GeometricFace P) (Set E) where
+  coe := toSet
+
+/-- The affine dimension of a geometric face -/
+noncomputable def dim (F : GeometricFace P) : ℤ :=
+  affineDim ℝ F.toSet
+
+/-- Partial order on geometric faces by set inclusion -/
+instance : PartialOrder (GeometricFace P) where
+  le F G := F.toSet ⊆ G.toSet
+  le_refl F := Set.Subset.rfl
+  le_trans F G H := Set.Subset.trans
+  le_antisymm F G hFG hGF := by
+    have : F.val = G.val := Set.Subset.antisymm hFG hGF
+    exact Subtype.ext this
+
+/-- Convert a Face to a GeometricFace -/
+noncomputable def ofFace (F : Face P) (hne : F.toSet.Nonempty) : GeometricFace P :=
+  ⟨F.toSet, F.isExposed, hne⟩
+
+/-- Every geometric face has at least one Face witness -/
+theorem exists_face_witness (G : GeometricFace P) : ∃ F : Face P, F.toSet = G.toSet := by
+  sorry
+
+end GeometricFace
+
 /-- Incidence relation: a (k-1)-face is on the boundary of a k-face -/
 def incidentFaces (P : ConvexPolyhedron E) (k : ℕ) (F : Face P) (G : Face P) : Prop :=
   F.dim = k - 1 ∧ G.dim = k ∧ F.toSet ⊆ G.toSet
