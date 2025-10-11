@@ -155,7 +155,14 @@ theorem isExposed (F : Face P) : IsExposed ℝ (P : Set E) F.toSet := by
 
       -- Get nonemptiness of F.vertices from h_nonempty
       have hF_nonempty : F.vertices.Nonempty := by
-        sorry  -- Can derive from h_nonempty : F.toSet.Nonempty
+        -- If F.vertices were empty, then F.toSet = convexHull ∅ = ∅
+        by_contra hempty
+        simp only [Finset.not_nonempty_iff_eq_empty] at hempty
+        have : F.toSet = ∅ := by
+          rw [Face.toSet, hempty]
+          simp only [Finset.coe_empty, convexHull_empty]
+        rw [this] at h_nonempty
+        exact Set.not_nonempty_empty h_nonempty
 
       -- Get a vertex to establish the maximum value M
       obtain ⟨v, hv⟩ := hF_nonempty
