@@ -63,14 +63,17 @@ def edges := P.faces 1
 /-- 2-dimensional faces (faces in the geometric sense) -/
 def faces2D := P.faces 2
 
-/-- Count of vertices -/
-noncomputable def numVertices (P : ConvexPolyhedron3D) : ℕ := (P.faces_finite 0).toFinset.card
+/-- Count of vertices (counts geometric 0-dimensional faces) -/
+noncomputable def numVertices (P : ConvexPolyhedron3D) : ℕ :=
+  (P.geometric_faces_finite 0).toFinset.card
 
-/-- Count of edges -/
-noncomputable def numEdges (P : ConvexPolyhedron3D) : ℕ := (P.faces_finite 1).toFinset.card
+/-- Count of edges (counts geometric 1-dimensional faces) -/
+noncomputable def numEdges (P : ConvexPolyhedron3D) : ℕ :=
+  (P.geometric_faces_finite 1).toFinset.card
 
-/-- Count of 2-faces -/
-noncomputable def numFaces (P : ConvexPolyhedron3D) : ℕ := (P.faces_finite 2).toFinset.card
+/-- Count of 2-faces (counts geometric 2-dimensional faces) -/
+noncomputable def numFaces (P : ConvexPolyhedron3D) : ℕ :=
+  (P.geometric_faces_finite 2).toFinset.card
 
 /-- The Euler characteristic V - E + F (combinatorial definition) -/
 noncomputable def eulerCharacteristicCombinatorial (P : ConvexPolyhedron3D) : ℤ :=

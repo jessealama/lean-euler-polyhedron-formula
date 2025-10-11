@@ -57,31 +57,46 @@ namespace ConvexPolyhedron
 
 section ChainComplex
 
-/-- Helper to get the index set for k-faces. Returns subtype of faces with dimension k. -/
-def facesIndexSet (P : ConvexPolyhedron E) (k : ℤ) : Type _ :=
-  if 0 ≤ k then { F : Face P // F.dim = k } else PUnit
+/-- Helper to get the index set for k-faces.
+Returns the set of geometric k-dimensional faces (as Set E, not Face structures).
 
-/-- The k-faces form a finite type (assuming faces_finite) -/
+NOTE: We index by geometric faces rather than Face structures because:
+- Each geometric face has infinitely many Face representations (differing by supporting functional)
+- For the chain complex, we only care about the geometric face itself
+- geometric_faces_finite ensures this index set is finite -/
+def facesIndexSet (P : ConvexPolyhedron E) (k : ℤ) : Type _ :=
+  if 0 ≤ k then { s : Set E // ∃ F : Face P, F.dim = k ∧ s = F.toSet } else PUnit
+
+/-- The k-dimensional geometric faces form a finite type -/
 noncomputable instance (P : ConvexPolyhedron E) (k : ℤ) : Fintype (P.facesIndexSet k) := by
   unfold facesIndexSet
   split
-  · -- k ≥ 0: Use faces_finite to get Fintype
-    -- Convert ℤ to ℕ (we know k ≥ 0)
-    have hk : 0 ≤ k := by assumption
-    let k_nat : ℕ := Int.toNat k
-    have hk_eq : (k_nat : ℤ) = k := Int.toNat_of_nonneg hk
-    -- We need Fintype for {F : Face P // F.dim = k}
-    -- The set {F | F.dim = k} equals {F | F.dim = (k_nat : ℤ)} by hk_eq
-    -- By faces_finite, {F | F.dim = (k_nat : ℤ)} = P.faces k_nat is finite
-    -- Use Set.Finite.fintype to get the Fintype instance
-    have h_finite : ({F : Face P | F.dim = k} : Set (Face P)).Finite := by
-      have := faces_finite P k_nat
-      convert this
-      ext F
-      simp only [faces, Set.mem_setOf_eq, hk_eq]
-    exact h_finite.fintype
+  · -- k ≥ 0: Use geometric_faces_finite to get Fintype
+    exact (geometric_faces_finite P k).fintype
   · -- k < 0: PUnit is finite
     infer_instance
+
+/-- Geometric incidence relation: geometric face s is incident to geometric face t
+if s ⊆ t and there exist Face representatives with appropriate dimensions.
+
+This is well-defined on geometric faces because incidence depends only on
+the underlying sets, not on the choice of supporting functional. -/
+def geometricIncident (P : ConvexPolyhedron E) (s t : Set E) : Prop :=
+  s ⊆ t ∧ ∃ (F G : Face P), F.toSet = s ∧ G.toSet = t ∧ F.dim + 1 = G.dim
+
+/-- Make geometricIncident decidable using classical logic for use in if statements -/
+noncomputable instance (P : ConvexPolyhedron E) (s t : Set E) :
+    Decidable (P.geometricIncident s t) :=
+  Classical.dec _
+
+/-- Extract the underlying Set E from a facesIndexSet element.
+When k ≥ 0, this is the geometric face (a Set E).
+When k < 0, facesIndexSet k = PUnit, so we return ∅. -/
+def geomFaceOfIndex (P : ConvexPolyhedron E) (k : ℤ) (idx : P.facesIndexSet k) : Set E :=
+  if h : 0 ≤ k then
+    (cast (by unfold facesIndexSet; simp [h]) idx : { s : Set E // ∃ F : Face P, F.dim = k ∧ s = F.toSet }).val
+  else
+    ∅
 
 /-- The chain group of k-dimensional faces (functions from k-faces to ZMod 2).
 
@@ -118,25 +133,17 @@ For k ≤ 0, the boundary map is the zero map (source is trivial).
 This follows the pattern from Polyhedron.lean, using functions instead of Finsupp
 for simpler type class inference.
 
-Helper function to compute the boundary map value. Returns 0 if k ≤ 0 or k-1 < 0. -/
+Helper function to compute the boundary map value. Returns 0 if k ≤ 0 or k-1 < 0.
+
+NOTE: Now uses geometric faces via geomFaceOfIndex to extract Set E values. -/
 noncomputable def boundaryMapValue (P : ConvexPolyhedron E) (k : ℤ)
-    (chain : P.chainGroup k) (g : P.facesIndexSet (k - 1)) : ZMod 2 :=
-  if h : 0 < k ∧ 0 ≤ k - 1 then
-    -- Both k and k-1 are non-negative, so facesIndexSet gives subtypes
-    have hk_nonneg : 0 ≤ k := le_of_lt h.1
-    have hk1_nonneg : 0 ≤ k - 1 := h.2
-    -- Use the fact that when k ≥ 0, facesIndexSet k = { F : Face P // F.dim = k }
-    have idx_k : P.facesIndexSet k = { F : Face P // F.dim = k } := by
-      unfold facesIndexSet
-      split_ifs
-      · rfl
-    have idx_k1 : P.facesIndexSet (k - 1) = { F : Face P // F.dim = k - 1 } := by
-      unfold facesIndexSet
-      split_ifs
-      · rfl
-    -- For each (k-1)-face g, sum over all k-faces F that are incident to g
-    Finset.univ.sum fun F : P.facesIndexSet k =>
-      if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then chain F else 0
+    (chain : P.chainGroup k) (g_idx : P.facesIndexSet (k - 1)) : ZMod 2 :=
+  if 0 ≤ k - 1 then
+    -- Both k and k-1 are non-negative, so we can extract geometric faces
+    Finset.univ.sum fun F_idx : P.facesIndexSet k =>
+      if P.geometricIncident (P.geomFaceOfIndex (k - 1) g_idx) (P.geomFaceOfIndex k F_idx) then
+        chain F_idx
+      else 0
   else
     0
 
@@ -148,30 +155,23 @@ noncomputable def boundaryMap (P : ConvexPolyhedron E) (k : ℤ) :
     funext g
     unfold boundaryMapValue
     split_ifs with h
-    · -- Case: 0 < k ∧ 0 ≤ k - 1
+    · -- Case: 0 ≤ k - 1, so the sum is well-defined
       -- The sum distributes over addition
-      have hk_nonneg : 0 ≤ k := le_of_lt h.1
-      have hk1_nonneg : 0 ≤ k - 1 := h.2
-      have idx_k : P.facesIndexSet k = { F : Face P // F.dim = k } := by
-        unfold facesIndexSet
-        split_ifs
-        · rfl
-      have idx_k1 : P.facesIndexSet (k - 1) = { F : Face P // F.dim = k - 1 } := by
-        unfold facesIndexSet
-        split_ifs
-        · rfl
-      have h_dist : ∀ F : P.facesIndexSet k,
-        (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then (x + y) F else 0) =
-        (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then x F else 0) +
-        (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then y F else 0) := by
-        intro F
+      have h_dist : ∀ F_idx : P.facesIndexSet k,
+        (if P.geometricIncident (P.geomFaceOfIndex (k - 1) g) (P.geomFaceOfIndex k F_idx) then
+          (x + y) F_idx else 0) =
+        (if P.geometricIncident (P.geomFaceOfIndex (k - 1) g) (P.geomFaceOfIndex k F_idx) then
+          x F_idx else 0) +
+        (if P.geometricIncident (P.geomFaceOfIndex (k - 1) g) (P.geomFaceOfIndex k F_idx) then
+          y F_idx else 0) := by
+        intro F_idx
         split_ifs
         · rfl
         · simp
       simp_rw [h_dist]
       rw [Finset.sum_add_distrib]
       rfl
-    · -- Case: ¬(0 < k ∧ 0 ≤ k - 1), so the map is zero
+    · -- Case: ¬(0 ≤ k - 1), so the map is zero
       rfl
   map_smul' := by
     intro r x
@@ -179,30 +179,24 @@ noncomputable def boundaryMap (P : ConvexPolyhedron E) (k : ℤ) :
     unfold boundaryMapValue
     simp only [RingHom.id_apply]
     split_ifs with h
-    · -- Case: 0 < k ∧ 0 ≤ k - 1
+    · -- Case: 0 ≤ k - 1, so the sum is well-defined
       -- Scalar multiplication distributes through the sum
-      have hk_nonneg : 0 ≤ k := le_of_lt h.1
-      have hk1_nonneg : 0 ≤ k - 1 := h.2
-      have idx_k : P.facesIndexSet k = { F : Face P // F.dim = k } := by
-        unfold facesIndexSet
-        split_ifs
-        · rfl
-      have idx_k1 : P.facesIndexSet (k - 1) = { F : Face P // F.dim = k - 1 } := by
-        unfold facesIndexSet
-        split_ifs
-        · rfl
-      have h_dist : ∀ F : P.facesIndexSet k,
-        (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then (r • x) F else 0) =
-        r • (if P.incident (idx_k1 ▸ g).val (idx_k ▸ F).val then x F else 0) := by
-        intro F
+      have h_dist : ∀ F_idx : P.facesIndexSet k,
+        (if P.geometricIncident (P.geomFaceOfIndex (k - 1) g) (P.geomFaceOfIndex k F_idx) then
+          (r • x) F_idx else 0) =
+        r • (if P.geometricIncident (P.geomFaceOfIndex (k - 1) g) (P.geomFaceOfIndex k F_idx) then
+          x F_idx else 0) := by
+        intro F_idx
         split_ifs
         · rfl
         · simp
       simp_rw [h_dist]
       rw [← Finset.smul_sum]
       rfl
-    · -- Case: ¬(0 < k ∧ 0 ≤ k - 1), so the map is zero
-      rfl
+    · -- Case: ¬(0 ≤ k - 1), so the map is zero
+      -- Both sides are 0: LHS = 0 by definition, RHS = (r • fun g => 0) g = r • 0 = 0
+      show 0 = (r • fun _ : P.facesIndexSet (k - 1) => (0 : ZMod 2)) g
+      simp [Pi.smul_apply]
 }
 
 /-- Extensionality for ZMod 2: two values are equal iff they have the same underlying value.
