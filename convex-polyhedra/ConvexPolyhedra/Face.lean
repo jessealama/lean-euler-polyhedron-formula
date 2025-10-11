@@ -471,105 +471,86 @@ theorem incident_asymm (P : ConvexPolyhedron E) {F G : Face P}
   have hGF := incident_dim P h'
   omega
 
-/-- Helper lemma: For a fixed vertex subset S ⊆ P.vertices and dimension k,
-the set of Face structures with exactly those vertices and that dimension is finite.
+omit [FiniteDimensional ℝ E] in
+/-- The set of geometric k-dimensional faces is finite.
 
-This is the key technical lemma for proving faces_finite. The geometric intuition is that
-while infinitely many linear functionals might theoretically expose the same geometric face,
-the Face structures that actually arise in our construction are finite.
+This is the correct finiteness theorem for faces. Each geometric face is the convex hull
+of some subset of vertices, and since P.vertices is finite, there are only finitely many
+such convex hulls.
 
-The proof strategy relies on the fact that:
-1. The supporting functional for a face is determined (up to positive scaling and adding constants)
-   by the requirement that it's constant on the face and maximized there
-2. The space of such functionals is finite-dimensional (bounded by dimension of E)
-3. For a fixed geometric face, we only care about functionally distinct Face structures
+Note: This counts GEOMETRIC faces (sets in E), not Face structures. The Face type has
+infinitely many elements (one for each supporting functional), but these all represent
+finitely many geometric objects. -/
+theorem geometric_faces_finite (P : ConvexPolyhedron E) (k : ℤ) :
+    ({s : Set E | ∃ F : Face P, F.dim = k ∧ s = F.toSet} : Set (Set E)).Finite := by
+  -- Strategy: Each geometric face is convexHull ℝ (F.vertices : Set E)
+  -- The set of all possible F.vertices is a subset of powerset of P.vertices
+  -- The powerset is finite, so the set of geometric faces is finite
 
-For the purposes of establishing finiteness, we can use the fact that the set is
-either empty (if no such face exists) or can be put in bijection with a subset
-of a finite-dimensional space. -/
-lemma finite_faces_with_fixed_vertices (P : ConvexPolyhedron E) (S : Finset E)
-    (hS : S ⊆ P.vertices) (k : ℤ) :
-    ({F : Face P | (F.vertices : Set E) = (S : Set E) ∧ F.dim = k} : Set (Face P)).Finite := by
-  -- This requires showing that Face structures with the same vertices are essentially unique
-  -- or at least finite. The key insight is that the supporting functional is constrained
-  -- by the vertices it must maximize.
-
-  -- For now, we accept this as an axiom/sorry, with the understanding that this is
-  -- provable using one of these approaches:
-  -- 1. Canonical representative: choose a specific functional for each geometric face
-  -- 2. Finite parametrization: show the space of functionals is finite-dimensional
-  -- 3. Constructive bound: bound the number of Face structures by a computable finite value
-  sorry
-
-/-- The k-dimensional faces form a finite set (key theorem).
-
-## Proof Strategy
-
-The key insight is that each k-face corresponds to a subset of P.vertices with
-specific properties. Since P.vertices is finite, there are only finitely many
-such subsets, and hence finitely many k-faces.
-
-Proof outline:
-1. Show the set of vertex subsets {F.vertices | F ∈ faces k} is finite
-2. This set is contained in P.vertices.powerset, which is finite
-3. Use finiteness of the range to establish finiteness of the domain
-
-The subtle point is that multiple Face structures could theoretically have the
-same vertices but different supporting functionals. However, we show that the
-set of possible vertex subsets for k-faces is finite, and this bounds the number
-of k-faces. -/
-theorem faces_finite (P : ConvexPolyhedron E) (k : ℕ) : (P.faces k).Finite := by
-  -- The set of vertices is finite
-  have h_vertices_finite : (P.vertices : Set E).Finite := Finset.finite_toSet P.vertices
-
-  -- The powerset of a finite set is finite
-  have h_powerset_finite : (𝒫 (P.vertices : Set E)).Finite := h_vertices_finite.powerset
-
-  -- Define the function that maps each face to its vertex set
-  let f : Face P → Set E := fun F => (F.vertices : Set E)
-
-  -- The image of f on faces k is a subset of the powerset
-  have h_image_subset : f '' (P.faces k) ⊆ 𝒫 (P.vertices : Set E) := by
-    intro S hS
-    simp only [Set.mem_image, faces, Set.mem_setOf_eq] at hS
-    obtain ⟨F, _, rfl⟩ := hS
-    change (F.vertices : Set E) ⊆ (P.vertices : Set E)
-    exact_mod_cast F.subset
-
-  -- Therefore the image is finite
-  have h_image_finite : (f '' (P.faces k)).Finite := h_powerset_finite.subset h_image_subset
-
-  -- Apply Set.Finite.of_finite_fibers: if the image is finite and each fiber is finite,
-  -- then the domain is finite
-  apply Set.Finite.of_finite_fibers f h_image_finite
-
-  -- For each vertex set S in the image, show the fiber is finite
-  intro S hS
-  -- The fiber is: (P.faces k) ∩ f⁻¹' {S}
-  --             = {F ∈ faces k | (F.vertices : Set E) = S}
-  --             = {F : Face P | F.dim = k ∧ (F.vertices : Set E) = S}
-
-  -- Extract the Finset corresponding to S
-  simp only [Set.mem_image, faces, Set.mem_setOf_eq] at hS
-  obtain ⟨F₀, hF₀_dim, hF₀_vertices⟩ := hS
-
-  -- The fiber is contained in the set of faces with fixed vertices F₀.vertices
-  have h_fiber_subset : (P.faces k) ∩ f ⁻¹' {S} ⊆
-      {F : Face P | (F.vertices : Set E) = (F₀.vertices : Set E) ∧ F.dim = k} := by
-    intro F hF
-    simp only [Set.mem_inter_iff, Set.mem_preimage, Set.mem_singleton_iff, faces,
-      Set.mem_setOf_eq] at hF ⊢
-    -- hF.1 : F.dim = k
-    -- hF.2 : f F = S, which means (F.vertices : Set E) = S
-    -- hF₀_vertices : f F₀ = S, which means (F₀.vertices : Set E) = S
-    -- Therefore (F.vertices : Set E) = (F₀.vertices : Set E)
+  -- Step 1: Show the set is contained in {convexHull ℝ S | S ⊆ P.vertices}
+  have h_subset : {s : Set E | ∃ F : Face P, F.dim = k ∧ s = F.toSet} ⊆
+      {s : Set E | ∃ S : Set E, S ⊆ (P.vertices : Set E) ∧ s = convexHull ℝ S} := by
+    intro s hs
+    obtain ⟨F, _, rfl⟩ := hs
+    use (F.vertices : Set E)
     constructor
-    · exact hF.2.trans hF₀_vertices.symm
-    · exact hF.1
+    · exact_mod_cast F.subset
+    · rfl
 
-  -- By the helper lemma, this set is finite
-  have h_fixed_finite := finite_faces_with_fixed_vertices P F₀.vertices F₀.subset k
-  exact h_fixed_finite.subset h_fiber_subset
+  -- Step 2: The target set is finite (it's the image of powerset under convexHull)
+  have h_target_finite :
+      {s : Set E | ∃ S : Set E, S ⊆ (P.vertices : Set E) ∧ s = convexHull ℝ S}.Finite := by
+    -- P.vertices is finite
+    have h_vertices_finite : (P.vertices : Set E).Finite := Finset.finite_toSet P.vertices
+    -- The powerset is finite
+    have h_powerset_finite : (𝒫 (P.vertices : Set E)).Finite := h_vertices_finite.powerset
+    -- The image under convexHull is finite
+    have h_image_finite : (convexHull ℝ '' 𝒫 (P.vertices : Set E)).Finite :=
+      h_powerset_finite.image (convexHull ℝ)
+    -- Show our set equals the image
+    have : {s : Set E | ∃ S : Set E, S ⊆ (P.vertices : Set E) ∧ s = convexHull ℝ S} =
+        convexHull ℝ '' 𝒫 (P.vertices : Set E) := by
+      ext s
+      simp only [Set.mem_setOf_eq, Set.mem_image]
+      constructor
+      · intro ⟨S, hS, hs⟩
+        use S
+        constructor
+        · exact Set.mem_powerset_iff _ _ |>.mpr hS
+        · exact hs.symm
+      · intro ⟨S, hS, hs⟩
+        use S
+        constructor
+        · exact Set.mem_powerset_iff _ _ |>.mp hS
+        · exact hs.symm
+    rw [this]
+    exact h_image_finite
+
+  exact h_target_finite.subset h_subset
+
+/-- DEPRECATED: This theorem statement is incorrect.
+
+The issue: This tries to prove that (P.faces k : Set (Face P)) is finite, but this set is
+actually INFINITE for most polyhedra. The Face type includes the supporting functional as
+structural data, and infinitely many functionals can expose the same geometric face.
+
+Example: For a triangle with edge face S = {(1,0), (0,1)}, the functionals l(x,y) = c(x+y)
+for all c > 0 all maximize exactly on S, giving uncountably many Face structures.
+
+The CORRECT theorem is `geometric_faces_finite`, which counts geometric faces (sets in E)
+rather than Face structures. That theorem is provable and is what we actually need for
+Euler characteristic computations.
+
+This theorem is left as sorry to document the architectural issue. In practice, use
+`geometric_faces_finite` for any finiteness reasoning about faces. -/
+theorem faces_finite (P : ConvexPolyhedron E) (k : ℕ) : (P.faces k).Finite := by
+  -- This statement is false in general. The set {F : Face P | F.dim = k} includes
+  -- all Face structures with dimension k, but there are infinitely many such structures
+  -- (one for each supporting functional).
+  --
+  -- To prove finiteness of faces, use geometric_faces_finite instead, which counts
+  -- the finite set of geometric faces: {F.toSet | F : Face P, F.dim = k}
+  sorry
 
 /-- Incidence relation: a (k-1)-face is on the boundary of a k-face -/
 def incidentFaces (P : ConvexPolyhedron E) (k : ℕ) (F : Face P) (G : Face P) : Prop :=
