@@ -326,312 +326,116 @@ theorem exists_vertex_not_in_affineSpan {P : ConvexPolyhedron E} {F G : Face P}
 /-- Given a vertex v in a face G but not in the affine span of face F,
 there exists a face H containing F and v with dimension exactly dim F + 1.
 
-This is the construction step: given F and a new vertex v, we can build
-a face H = F ∪ {v} with the right dimension.
+This is the key construction lemma for the graded lattice structure: it allows us
+to "grow" a face by adding one vertex at a time while controlling the dimension.
 
-## Proof Strategy
+## Geometric Strategy
 
-The construction combines exposed face theory with dimension control via three main steps:
+The construction works in three conceptual steps:
 
-### Step 1: Separate v from affineSpan(F.vertices)
+### Step 1: Identify the Target Affine Subspace
 
-Since v ∉ affineSpan(F.vertices), use the geometric Hahn-Banach separation theorem
-to construct a continuous linear functional f₀ : E →L[ℝ] ℝ such that:
-  f₀(v) > sup{f₀(w) | w ∈ affineSpan(F.vertices)}
+Since v ∉ affineSpan(F.vertices), the affine span of F.vertices ∪ {v} has dimension
+exactly dim(F) + 1 (fundamental theorem of affine geometry):
 
-**Mathlib infrastructure needed**:
-- `Analysis.NormedSpace.HahnBanach.Separation.geometric_hahn_banach_point_point`
-  or `separate_convex_open_set` for strict separation
-- May need custom lemma: `exists_separating_functional_affineSpan` that adapts
-  these results specifically for affine subspaces
+```lean
+let S := affineSpan ℝ (insert v (F.vertices : Set E))
+have : affineDim ℝ S = affineDim ℝ (F.toSet) + 1
+```
 
-### Step 2: Construct H as an exposed face
+This S is our "target" - we want H to be the intersection S ∩ P (or at least contain it).
 
-Define H as the face of P determined by functional f, where vertices maximizing f
-should be exactly F.vertices ∪ {v}:
+### Step 2: Prove the Intersection is an Exposed Face
+
+The set H_set := S ∩ P is an exposed face of P. This requires showing:
+1. H_set is nonempty (contains F.vertices ∪ {v})
+2. There exists a linear functional φ : E →L[ℝ] ℝ such that
+   H_set = {x ∈ P | φ achieves maximum on P at x}
+
+**Key idea**: Use Hahn-Banach separation to construct φ that:
+- Vanishes on S.direction (making φ constant on the affine subspace S)
+- Achieves its maximum on P exactly at points in S
+
+The construction uses `exists_extension_of_le_sublinear` with an appropriately chosen
+gauge function to extend the zero functional on S.direction to all of E.
+
+### Step 3: Construct the Face Witness
+
+Once we have H_set and its exposing functional φ, construct the Face structure:
 
 ```lean
 H : Face P := {
-  support := f (normalized appropriately)
-  vertices := {w ∈ P.vertices | f maximizes at w}
-  subset := ... (from P.vertices)
-  is_maximal := ... (verification that f achieves max exactly at these vertices)
-}
-```
-
-**Key challenges**:
-1. Ensuring f maximizes on exactly F.vertices ∪ {v}, not other vertices of G
-2. The Face structure couples functional with vertices - must construct both together
-3. Proving v ∈ H.vertices requires showing f(v) ≥ f(w) for all w ∈ P.vertices
-
-**Mathlib infrastructure needed**:
-- `Analysis.Convex.Exposed.ContinuousLinearMap.toExposed` - construct exposed face
-  from functional
-- `Analysis.Convex.Exposed.IsExposed` - theory of exposed faces
-- May need lemma: `face_of_functional_on_polytope` showing that the max-set of
-  a linear functional on a polytope forms a face
-
-### Step 3: Verify dimension increases by exactly 1
-
-The geometric fact: adding a point outside an affine span increases dimension by 1:
-
-```lean
-affineDim(convexHull(F.vertices ∪ {v})) = affineDim(convexHull(F.vertices)) + 1
-```
-
-**Proof approach**:
-- Use that v ∉ affineSpan(F.vertices) implies v is affinely independent from F.vertices
-- Dimension of affine span is determined by affine independence
-- Show affineSpan(F.vertices ∪ {v}) has direction space one dimension larger
-
-**Mathlib infrastructure needed**:
-- `LinearAlgebra.AffineSpace.Independent.affineDim` - dimension and affine independence
-- `LinearAlgebra.AffineSpace.FiniteDimensional` - dimension properties
-- May need custom lemma: `affineDim_insert_of_not_mem_affineSpan` stating the
-  dimension increase explicitly
-
-### Alternative Approaches Considered
-
-1. **Convex Hull Method**: Define H directly as convexHull(F.vertices ∪ {v}) ∩ G,
-   then prove it's an exposed face. Simpler but less general.
-
-2. **Lattice Growth**: Use the graded poset structure of the face lattice to find
-   a minimal covering face. More abstract, avoids functional analysis but harder
-   to control dimension.
-
-The exposed face + separation approach was chosen as the most explicit and aligned
-with our Face structure definition.
-
-### Refined Construction Strategy (Most Promising)
-
-After deeper analysis, here's a more concrete geometric construction that directly
-applies Hahn-Banach to build the face H:
-
-**Key Insight**: We don't need H.vertices = F.vertices ∪ {v} exactly. Instead:
-- v ∈ H.vertices (v must be included)
-- F < H (proper containment, so H contains vertices from F)
-- dim(H) = dim(F) + 1 (dimension increases by exactly 1)
-
-#### Construction Steps
-
-**Step 1: Build the target affine subspace**
-
-```lean
--- The affine span of F.vertices ∪ {v}
-let S : AffineSubspace ℝ E := affineSpan ℝ (insert v (F.vertices : Set E))
-
--- Key property: v ∉ affineSpan(F.vertices) implies
-have hS_dim : affineDim ℝ S = affineDim ℝ (F.toSet) + 1 :=
-  affineDim_insert_of_not_mem_affineSpan hv_not_in_F
-```
-
-S is the "target" - we want H to be (at least) S ∩ P.
-
-**Step 2: Construct separating functional via Hahn-Banach**
-
-The goal: Build φ : E →L[ℝ] ℝ such that:
-- φ is "constant" on S (or rather, on S.direction)
-- φ separates S from points in P outside S
-- Specifically: φ(w) < sup{φ(x) | x ∈ S} for all w ∈ P \ S
-
-Construction approach:
-```lean
--- Define a partial linear functional on S.direction that's "constant" (zero)
-let f_partial : S.direction →ₗ[ℝ] ℝ := 0
-
--- Choose a base point p₀ ∈ S (say, the first vertex in F)
-let p₀ := some vertex from F.vertices
-
--- Use Hahn-Banach to extend to all of E
--- The gauge function / sublinear bound controls how φ grows outside S
-obtain ⟨φ_linear : E →ₗ[ℝ] ℝ, extends, bounded⟩ :=
-  exists_extension_of_le_sublinear f_partial gauge_P ...
-
--- Convert to continuous linear map
-let φ : E →L[ℝ] ℝ := φ_linear.to_continuous_of_bounded ...
-```
-
-**The gauge function**: We need a sublinear map N : E → ℝ such that:
-- N is small/controlled on S.direction (allowing φ to be nearly constant there)
-- N grows appropriately in other directions (ensuring separation)
-
-One approach: Use the gauge of P itself, possibly modified to encode the constraint.
-
-**Step 3: Define H as the exposed face determined by φ**
-
-```lean
--- H consists of points in P where φ achieves its maximum
-let max_val := ⨆ w ∈ P.vertices, φ(w)
-let H_vertices := {w ∈ P.vertices | φ(w) = max_val}
-
--- Construct the Face structure
-let H : Face P := {
   support := φ
-  vertices := H_vertices
+  vertices := {w ∈ P.vertices | w ∈ H_set}
   subset := ...
-  is_maximal := ... -- Verification that φ achieves max exactly at H_vertices
+  is_maximal := ... (verification that φ maximizes exactly on H.vertices)
 }
 ```
 
-**Step 4: Verify the properties**
+The geometric properties (v ∈ H, F < H, H ≤ G, dim(H) = dim(F) + 1) then follow
+from the construction and affine geometry.
 
-Need to show:
-1. v ∈ H.vertices: Since v ∈ S and φ is "constant" on S, φ(v) = max_val
-2. F < H: Some (or all) of F.vertices achieve the maximum, so F.vertices ⊆ H.vertices
-3. H ≤ G: This follows from construction if we ensure φ respects G's structure
-4. dim(H) = dim(F) + 1: Since H contains S ∩ P and φ is constant on S
+## Required Infrastructure
 
-#### Hahn-Banach Application Details
+The proof requires three main ingredients from Mathlib:
 
-The precise use of `exists_extension_of_le_sublinear` would be:
+1. **Affine dimension theory** (`LinearAlgebra.AffineSpace.FiniteDimensional`):
+   - Dimension increases by 1 when adding a point outside the affine span
+   - Affine span of convex hull equals affine span of generators
+   - Direction space properties
 
-```lean
--- Set up the extension problem in the direction space
-let D := S.direction  -- Subspace of E (vector space, not affine)
-let f : D →ₗ[ℝ] ℝ := 0  -- Constant zero functional on S's direction
+2. **Hahn-Banach separation** (`Analysis.NormedSpace.HahnBanach`):
+   - Extension of linear functionals dominated by sublinear maps
+   - Gauge functions and their properties
+   - Continuous extension theorems
 
--- Define sublinear map (gauge function)
--- Option 1: Use distance from S
-let N₁ : E → ℝ := λ x ↦ dist x S
+3. **Exposed face theory** (`Analysis.Convex.Exposed`):
+   - Characterization of exposed faces via linear functionals
+   - Properties of maximal sets of linear functionals
+   - Connection to Face structure
 
--- Option 2: Use gauge of a convex set related to P
-let N₂ : E → ℝ := gauge_function_of P
+## Implementation Notes
 
--- Apply Hahn-Banach
-obtain ⟨g : E →ₗ[ℝ] ℝ, hg_extends, hg_bounded⟩ :=
-  exists_extension_of_le_sublinear f N (N_homogeneous) (N_subadditive) (f_dominated)
-```
+**Difference from GeometricFace approach**: This theorem still works with the `Face P` type
+(which includes the supporting functional). However, the geometric insights carry over:
+the functional φ is not arbitrary but determined by the separation requirement.
 
-**Key verification**:
-- `N_homogeneous`: Prove N(c • x) = c * N(x) for c > 0
-- `N_subadditive`: Prove N(x + y) ≤ N(x) + N(y)
-- `f_dominated`: On D, we have f(x) ≤ N(x) (trivial since f = 0 and N ≥ 0)
+**Alternative**: The geometric version (returning a set proven to be exposed) would avoid
+the need to construct the specific Face witness. See FaceLatticeTheory.lean for the
+cleaner GeometricFace formulation.
 
-The extended functional g then gives us φ after appropriate normalization.
+**Why Hahn-Banach is essential**: We need explicit control over which vertices maximize
+the functional. Direct constructions (e.g., "pick any functional") fail because they
+don't guarantee the right dimension - other vertices might also achieve the maximum,
+giving dim(H) > dim(F) + 1.
 
-#### Working with Affine vs Linear Structures
-
-Important subtlety: Faces live in affine space, but Hahn-Banach works in vector spaces.
-
-**Bridge via direction spaces**:
-```lean
--- S is an affine subspace
--- S.direction is the associated vector subspace
--- For any p₀ ∈ S, we have S = p₀ +ᵥ S.direction
-
--- A linear functional φ : E →ₗ[ℝ] ℝ is "constant" on S iff
--- φ vanishes on S.direction (i.e., φ(v) = 0 for all v ∈ S.direction)
-```
-
-So our strategy is:
-1. Construct φ that vanishes on S.direction (via Hahn-Banach extension of 0)
-2. This makes φ "constant" on the affine subspace S
-3. All points in S ∩ P then achieve the same φ-value
-4. If we normalize so this value is maximal in P, we get our face H
-
-#### Remaining Technical Challenges
-
-1. **Choosing the right gauge function**: Need N that:
-   - Allows φ ≈ 0 on S.direction
-   - Makes φ(w) < 0 for w ∈ P \ S (after appropriate shift)
-   - Ensures the maximum on P is achieved at S ∩ P
-
-2. **Normalization and shifting**: The extended functional g might need:
-   - Normalization: multiply by constant
-   - Shifting: add constant
-   - To ensure max_val occurs at S ∩ P
-
-3. **Proving exactness of dimension**: Need to show:
-   - H contains S ∩ P (at least the vertices in S)
-   - H doesn't contain much more (dimension doesn't exceed dim(S))
-   - This requires careful analysis of which P-vertices achieve the maximum
-
-4. **Connecting to Face structure**: Need to verify:
-   - The vertex set H_vertices satisfies `is_maximal` property
-   - The constructed H actually forms a face (exposed face property)
-
-#### Mathlib Building Blocks to Investigate
-
-For implementation, we'll need:
-
-1. **Gauge functions**:
-   - `Mathlib.Analysis.Convex.Gauge` - gauge of convex sets
-   - Properties: homogeneity, subadditivity
-   - Connection to separation
-
-2. **Affine subspaces and directions**:
-   - `LinearAlgebra.AffineSpace.AffineSubspace` - affine subspace structure
-   - `AffineSubspace.direction` - associated vector subspace
-   - Properties linking affine and linear structures
-
-3. **Extension theorems**:
-   - `Analysis.Convex.Cone.Extension.exists_extension_of_le_sublinear` - main theorem
-   - `Analysis.NormedSpace.HahnBanach.Extension.exists_extension_norm_eq` - variant with norm
-   - Helper lemmas about extension and continuous extensions
-
-4. **Exposed faces in Mathlib**:
-   - `Analysis.Convex.Exposed.IsExposed` - definition
-   - `ContinuousLinearMap.toExposed` - construct exposed face from functional
-   - Properties: closure, compactness, etc.
-
-5. **Polytope-specific theory**:
-   - Check `Analysis.Convex.Polytope` (if it exists) for face constructions
-   - Separation lemmas for polytopes
-   - Vertex and edge properties
-
-This refined strategy provides a much more concrete path from Hahn-Banach to the desired
-face construction. The main work is in setting up the gauge function and proving the
-resulting functional has the right properties.
-
-### Required Helper Lemmas
-
-The proof will require formalizing these three critical lemmas:
+### Three Key Helper Lemmas
 
 ```lean
--- 1. Dimension increases by exactly 1 when adding point outside affine span
+-- 1. Affine dimension grows by exactly 1
 lemma affineDim_insert_of_not_mem_affineSpan {s : Finset E} {v : E}
     (hv : v ∉ affineSpan ℝ (s : Set E)) :
-    affineDim ℝ (convexHull ℝ (insert v s : Set E)) =
-    affineDim ℝ (convexHull ℝ (s : Set E)) + 1
+    affineDim ℝ (convexHull ℝ (insert v s : Set E)) = affineDim ℝ (convexHull ℝ (s : Set E)) + 1
 
--- 2. Separation from affine subspace via continuous linear functional
+-- 2. Separation from affine subspaces
 lemma exists_separating_functional_affineSpan {s : Finset E} {v : E}
     (hv : v ∉ affineSpan ℝ (s : Set E)) :
     ∃ f : E →L[ℝ] ℝ, f v > ⨆ w ∈ (s : Set E), f w
 
--- 3. Max-set of linear functional on polytope forms an exposed face
-lemma exposed_face_of_maximizing_functional (P : ConvexPolyhedron E) (f : E →L[ℝ] ℝ)
-    (T : Finset E) (hT : T ⊆ P.vertices) :
-    IsExposed ℝ (P : Set E) {x ∈ P | ∀ y ∈ P, f y ≤ f x} →
-    ∃ H : Face P, H.vertices = T ∧ (∀ w ∈ T, f w ≥ f v for all v ∈ P.vertices)
+-- 3. Exposed faces from functionals on polytopes
+lemma exposed_face_of_maximizing_functional (P : ConvexPolyhedron E) (f : E →L[ℝ] ℝ) :
+    IsExposed ℝ (P : Set E) {x ∈ P | ∀ y ∈ P, f y ≤ f x}
 ```
 
-### Known Complications
+## Current Status
 
-1. **Vertex Selection**: The functional must maximize on exactly the right vertices.
-   If other vertices of G also maximize f, dimension could increase by more than 1.
-   Solution: Carefully tune f using the separation property and the fact that
-   F.vertices are already in affineSpan(F.vertices).
+This is a deep geometric result requiring substantial Mathlib infrastructure. The proof
+strategy is sound but requires careful formalization of the Hahn-Banach construction
+and the dimension control machinery.
 
-2. **Constructiveness**: Hahn-Banach in Mathlib uses classical logic. If computational
-   extraction is needed, may require an alternative construction.
-
-3. **Exposed Face Integration**: While Mathlib has `IsExposed`, polytope-specific
-   versions may need additional infrastructure. Check `Analysis.Convex.Polytope`
-   for completeness.
-
-### Implementation Status
-
-Currently: `sorry` - This is a deep result requiring substantial geometric infrastructure.
-
-Next steps:
-1. Formalize the three helper lemmas above
-2. Implement functional construction using Hahn-Banach
-3. Build Face structure from constructed functional
-4. Verify all properties (F < H, H ≤ G, v ∈ H.vertices, dimension)
-
-This theorem is the main blocker for `exists_incident_face_below` and thus for
-the full graded lattice structure of the face poset. -/
+This theorem is the main blocker for `exists_incident_face_below`, which in turn
+is needed for the full graded lattice structure used in the Euler characteristic
+computation. -/
 theorem exists_face_extending_by_vertex {P : ConvexPolyhedron E} {F G : Face P}
     (hFG : F < G)
     (v : E) (hv_in_G : v ∈ G.vertices)
