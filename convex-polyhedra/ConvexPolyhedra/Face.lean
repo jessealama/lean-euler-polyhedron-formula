@@ -260,20 +260,49 @@ theorem isExposed (F : Face P) : IsExposed ℝ (P : Set E) F.toSet := by
     -- KEY INSIGHT: Combined with support_const_on_face_vertices, the maximality
     -- condition forces x to be in convexHull F.vertices.
 
-    -- Proof strategy (using our helper lemmas):
-    -- 1. Let M = max {F.support v | v ∈ P.vertices}
-    -- 2. Since x maximizes, F.support x = M
-    -- 3. Write x = Σᵢ λᵢ vᵢ where vᵢ ∈ P.vertices
-    -- 4. F.support x = Σᵢ λᵢ (F.support vᵢ) = M (by linearity)
-    -- 5. Since each F.support vᵢ ≤ M and the weighted average equals M,
-    --    all vᵢ with λᵢ > 0 must have F.support vᵢ = M
-    -- 6. By is_maximal, these vᵢ ∈ F.vertices
-    -- 7. By support_const_on_face_vertices, all such vᵢ achieve the same value
-    -- 8. Therefore x ∈ convexHull F.vertices = F.toSet
+    -- DETAILED PROOF STRATEGY:
     --
-    -- The key observation: is_maximal characterizes F.vertices as EXACTLY
-    -- the maximizers, and support_const_on_face_vertices shows they all
-    -- achieve the same value.
+    -- Goal: Show x ∈ convexHull ℝ (F.vertices : Set E)
+    --
+    -- What we have:
+    -- - x ∈ P, so x ∈ convexHull ℝ (P.vertices : Set E)
+    -- - hx_max : ∀ y ∈ P, F.support y ≤ F.support x  (x maximizes F.support)
+    --
+    -- Step 1: Express x as convex combination of P.vertices
+    --   Use: mem_convexHull or convexHull_eq to write
+    --        x = Σᵢ λᵢ vᵢ where vᵢ ∈ P.vertices, λᵢ ≥ 0, Σᵢ λᵢ = 1
+    --
+    -- Step 2: Apply linearity of F.support
+    --   F.support x = F.support (Σᵢ λᵢ vᵢ)
+    --               = Σᵢ λᵢ (F.support vᵢ)  (ContinuousLinearMap.map_sum)
+    --
+    -- Step 3: Each vertex satisfies F.support vᵢ ≤ F.support x
+    --   Since vᵢ ∈ P.vertices ⊆ P, we have F.support vᵢ ≤ F.support x (by hx_max)
+    --
+    -- Step 4: If weighted average equals upper bound, all terms must equal bound
+    --   KEY LEMMA NEEDED: If aᵢ ≤ M for all i, λᵢ ≥ 0, Σᵢ λᵢ = 1,
+    --   and Σᵢ λᵢ aᵢ = M, then aᵢ = M whenever λᵢ > 0
+    --
+    --   Apply this with aᵢ = F.support vᵢ, M = F.support x:
+    --   For all i with λᵢ > 0, we have F.support vᵢ = F.support x
+    --
+    -- Step 5: Maximizing vertices are exactly F.vertices
+    --   If F.support vᵢ = F.support x, then vᵢ maximizes F.support over P.vertices
+    --   By is_maximal (reverse direction), vᵢ ∈ F.vertices
+    --
+    -- Step 6: x is convex combination of F.vertices
+    --   Filter the sum to only include vertices with λᵢ > 0
+    --   All such vertices are in F.vertices (from Step 5)
+    --   Therefore x ∈ convexHull ℝ (F.vertices : Set E)
+    --
+    -- MATHLIB LEMMAS TO SEARCH FOR:
+    -- - mem_convexHull or finsum characterization
+    -- - Weighted average lemma (Step 4) - may need to prove ourselves
+    -- - F.support.map_sum for linearity over finite sums
+    --
+    -- POTENTIAL CHALLENGES:
+    -- - The weighted average lemma (Step 4) is the key technical piece
+    -- - May need to work with Finsupp or explicit finite sums
     sorry
 
 /-- The affine dimension of a face -/
