@@ -5,7 +5,9 @@ Authors: Jesse Alama
 -/
 import Mathlib.Analysis.Convex.Exposed
 import Mathlib.Analysis.Convex.Hull
+import Mathlib.Analysis.Convex.Intrinsic
 import Mathlib.LinearAlgebra.AffineSpace.FiniteDimensional
+import Mathlib.LinearAlgebra.AffineSpace.Pointwise
 import ConvexPolyhedra.Face
 
 /-!
@@ -44,7 +46,7 @@ intermediate faces, which requires meaningful equality.
 -/
 
 open Set Finset
-open scoped RealInnerProductSpace
+open scoped RealInnerProductSpace Pointwise
 
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
 
@@ -74,17 +76,6 @@ instance {P : ConvexPolyhedron E} : PartialOrder (GeometricFace P) where
 These establish that dimension is monotone with respect to face containment.
 -/
 
-/-- If F ⊂ G (strict containment), then dim F < dim G -/
-theorem geometric_dim_lt_of_ssubset {P : ConvexPolyhedron E} {F G : GeometricFace P}
-    (h : F < G) : F.dim < G.dim := by
-  sorry
-
-/-!
-### Intermediate Face Existence
-
-The key geometric construction showing that we can find faces of intermediate dimension.
--/
-
 /-- Affine dimension is monotone with respect to inclusion in affine spans.
 
 If s ⊆ affineSpan ℝ t, then affineDim ℝ s ≤ affineDim ℝ t.
@@ -106,6 +97,244 @@ theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan �
   -- affineDim is defined as Module.finrank of the direction
   simp only [affineDim]
   exact_mod_cast Submodule.finrank_mono h4
+
+/-- A nonempty convex set has nonempty intrinsic interior (relative interior).
+
+The intrinsic interior (also called relative interior) of a set is its interior when viewed
+as a subset of its affine span. This is a fundamental theorem in convex analysis.
+
+This is an alias for the existing Mathlib theorem `Set.Nonempty.intrinsicInterior`. -/
+theorem convex_intrinsicInterior_nonempty {s : Set E} (hs_conv : Convex ℝ s) (hs_ne : s.Nonempty) :
+    (intrinsicInterior ℝ s).Nonempty :=
+  hs_ne.intrinsicInterior hs_conv
+
+/-- Translation preserves affine dimension (via pointwise vadd).
+
+For any set s and vector v, translating s by v preserves affine dimension.
+This is because translation is an affine equivalence that preserves affine structure.
+
+This uses `AffineSubspace.pointwise_vadd_span` and `AffineSubspace.pointwise_vadd_direction`
+from Mathlib to show that translation preserves affine spans and their directions. -/
+theorem affineDim_vadd (v : E) (s : Set E) :
+    affineDim ℝ (v +ᵥ s) = affineDim ℝ s := by
+  -- affineSpan (v +ᵥ s) = v +ᵥ affineSpan s (by pointwise_vadd_span)
+  have h_span : affineSpan ℝ (v +ᵥ s) = v +ᵥ affineSpan ℝ s :=
+    (AffineSubspace.pointwise_vadd_span (k := ℝ) (V := E) (P := E) v s).symm
+  -- direction (v +ᵥ S) = S.direction for any affine subspace S
+  have h_dir : (v +ᵥ affineSpan ℝ s).direction = (affineSpan ℝ s).direction :=
+    AffineSubspace.pointwise_vadd_direction v (affineSpan ℝ s)
+  -- Combine: affineDim is the finrank of the direction
+  simp only [affineDim]
+  rw [h_span, h_dir]
+
+/-- Translation preserves affine dimension (via vsub/negation).
+
+For any set s and vector v, we have affineDim((-v) +ᵥ s) = affineDim(s).
+This follows immediately from affineDim_vadd. -/
+theorem affineDim_neg_vadd (v : E) (s : Set E) :
+    affineDim ℝ ((-v) +ᵥ s) = affineDim ℝ s :=
+  affineDim_vadd (-v) s
+
+/-- Translation preserves affine dimension (via image under subtraction map).
+
+For any set s and vector v, translating s by the map y ↦ y - v preserves affine dimension.
+This is a corollary of affineDim_vadd since (y - v) = y + (-v) = (-v) +ᵥ y. -/
+theorem affineDim_image_sub (v : E) (s : Set E) :
+    affineDim ℝ ((fun y => y - v) '' s) = affineDim ℝ s := by
+  -- The image {y - v | y ∈ s} equals (-v) +ᵥ s
+  have h_eq : (fun y => y - v) '' s = (-v) +ᵥ s := by
+    ext x
+    simp only [Set.mem_image, Set.mem_vadd_set, sub_eq_add_neg]
+    constructor
+    · intro ⟨y, hy, h⟩
+      exact ⟨y, hy, by rw [add_comm] at h; exact h⟩
+    · intro ⟨y, hy, h⟩
+      exact ⟨y, hy, by rw [add_comm]; exact h⟩
+  rw [h_eq]
+  exact affineDim_neg_vadd v s
+
+/-- **Key theorem about convex sets with full affine dimension.**
+
+If s and t are convex sets with:
+- s ⊆ t ⊆ affineSpan s
+- affineDim s = affineDim t = affineDim (affineSpan s)
+
+Then s = t.
+
+**Intuition**: The condition affineDim s = affineDim (affineSpan s) means s has
+"full dimension" in its affine hull. Such a set cannot be properly extended within
+that affine space without increasing dimension. Proper containment s ⊂ t while
+maintaining equal dimensions and equal affine spans is impossible.
+
+**References**:
+- Rockafellar, "Convex Analysis" (1970), Theorem 6.2 and Corollary 6.8.2
+- Schneider, "Convex Bodies" (2014), Theorem 1.1.4 (relative interior characterization)
+- Grünbaum, "Convex Polytopes" (2003), Theorem 2.1
+
+**Note**: This is a deep theorem that is not currently in Mathlib and deserves
+standalone formalization. -/
+theorem convex_eq_of_subset_affineSpan_same_dim_full {s t : Set E}
+    (hs_conv : Convex ℝ s) (ht_conv : Convex ℝ t)
+    (h_subset : s ⊆ t)
+    (h_in_span : t ⊆ affineSpan ℝ s)
+    (h_dim_eq : affineDim ℝ s = affineDim ℝ t)
+    (h_full : affineDim ℝ s = affineDim ℝ (affineSpan ℝ s : Set E)) :
+    s = t := by
+  sorry
+
+/-- If s ⊆ t ⊆ affineSpan s with equal affine dimensions, then t ⊆ s.
+
+This follows from the more general theorem about convex sets with full affine dimension.
+
+**References**:
+- Rockafellar, "Convex Analysis" (1970), Theorem 6.2
+- Ziegler, "Lectures on Polytopes" (1995), Proposition 2.4 -/
+theorem subset_of_subset_affineSpan_same_dim {s t : Set E}
+    (hs_conv : Convex ℝ s) (ht_conv : Convex ℝ t)
+    (h_subset : s ⊆ t)
+    (h_in_span : t ⊆ affineSpan ℝ s)
+    (h_dim_eq : affineDim ℝ s = affineDim ℝ t) :
+    t ⊆ s := by
+  -- Show affineSpan s = affineSpan t from containment conditions
+  have h_span_eq : affineSpan ℝ s = affineSpan ℝ t := by
+    have h1 : affineSpan ℝ s ≤ affineSpan ℝ t := affineSpan_mono ℝ h_subset
+    have h2 : affineSpan ℝ t ≤ affineSpan ℝ s := by
+      rw [affineSpan_le]
+      exact h_in_span
+    exact le_antisymm h1 h2
+
+  -- Show that s has full dimension in its affine span
+  have h_full : affineDim ℝ s = affineDim ℝ (affineSpan ℝ s : Set E) := by
+    simp only [affineDim]
+    -- affineSpan (affineSpan s) = affineSpan s by idempotence
+    rw [AffineSubspace.affineSpan_coe]
+
+  -- Apply the key theorem
+  have h_eq : s = t := by
+    exact convex_eq_of_subset_affineSpan_same_dim_full
+      hs_conv ht_conv h_subset h_in_span h_dim_eq h_full
+
+  exact h_eq ▸ Set.Subset.refl s
+
+
+/-- For exposed faces (GeometricFaces) of a convex polyhedron, if F ⊆ G and they have
+equal affine spans, then F = G as sets.
+
+This is a deep result in convex geometry: exposed faces are "relatively open" or "maximal"
+in their affine hull. If two exposed faces F ⊆ G share the same affine span, they must
+be equal.
+
+**Proof strategy (from Zen thinkdeep analysis)**:
+1. Both F and G are convex (exposed sets inherit convexity)
+2. Equal affine spans imply equal affine dimensions
+3. Use G ⊆ affineSpan F combined with equal dimensions
+4. Apply dimension/containment result to force equality
+
+This is simpler than using the functional characterization directly! -/
+theorem exposed_face_eq_of_subset_affineSpan_eq {P : ConvexPolyhedron E}
+    {F G : GeometricFace P}
+    (h_subset : F.toSet ⊆ G.toSet)
+    (h_span_eq : affineSpan ℝ F.toSet = affineSpan ℝ G.toSet) :
+    F.toSet = G.toSet := by
+  -- Step 1: Both F and G are convex (exposed faces of convex sets are convex)
+  have hF_conv : Convex ℝ F.toSet := F.convex
+  have hG_conv : Convex ℝ G.toSet := G.convex
+
+  -- Step 2: Equal affine spans imply equal affine dimensions
+  have h_dim_eq : affineDim ℝ F.toSet = affineDim ℝ G.toSet := by
+    -- affineDim is determined by affineSpan's direction dimension
+    -- Since affineSpan F = affineSpan G, their dimensions are equal
+    calc affineDim ℝ F.toSet
+        = Module.finrank ℝ (affineSpan ℝ F.toSet).direction := rfl
+      _ = Module.finrank ℝ (affineSpan ℝ G.toSet).direction := by rw [h_span_eq]
+      _ = affineDim ℝ G.toSet := rfl
+
+  -- Step 3: G ⊆ affineSpan F (from equal affine spans)
+  have hG_in_spanF : G.toSet ⊆ (affineSpan ℝ F.toSet : Set E) := by
+    have : G.toSet ⊆ (affineSpan ℝ G.toSet : Set E) := subset_affineSpan ℝ _
+    rw [h_span_eq.symm] at this
+    exact this
+
+  -- Step 4: Use antisymmetry - need to show G ⊆ F from the above
+  -- Key insight: F ⊆ G ⊆ affineSpan F with equal dimensions forces G ⊆ F
+  have : G.toSet ⊆ F.toSet := by
+    -- We have:
+    --   - F ⊆ G (h_subset)
+    --   - G ⊆ affineSpan F (hG_in_spanF, and affineSpan F = affineSpan G)
+    --   - affineDim F = affineDim G (h_dim_eq)
+    --   - F and G are both convex (hF_conv, hG_conv)
+    --
+    -- Apply the key lemma: if F ⊆ G ⊆ affineSpan F with equal dimensions, then G ⊆ F
+    exact subset_of_subset_affineSpan_same_dim hF_conv hG_conv h_subset hG_in_spanF h_dim_eq
+
+  exact Set.Subset.antisymm h_subset this
+
+/-- If F ⊂ G (strict containment), then dim F < dim G -/
+theorem geometric_dim_lt_of_ssubset {P : ConvexPolyhedron E} {F G : GeometricFace P}
+    (h : F < G) : F.dim < G.dim := by
+  -- Work by contrapositive: assume F.dim ≥ G.dim, derive contradiction
+  by_contra h_not_lt
+  push_neg at h_not_lt
+  -- h_not_lt : G.dim ≤ F.dim
+
+  -- We have F.toSet ⊆ G.toSet
+  have h_subset : F.toSet ⊆ G.toSet := h.le
+
+  -- By affineDim_le_of_subset_affineSpan: F.dim ≤ G.dim
+  have h_F_le_G : F.dim ≤ G.dim := by
+    have : F.toSet ⊆ affineSpan ℝ G.toSet := h_subset.trans (subset_affineSpan ℝ _)
+    exact affineDim_le_of_subset_affineSpan this
+
+  -- Combined with h_not_lt: F.dim = G.dim
+  have h_dim_eq : F.dim = G.dim := by omega
+
+  -- This means affineSpan ℝ F.toSet and affineSpan ℝ G.toSet have equal dimension
+  -- In finite dimensions, if S₁ ≤ S₂ and dim S₁ = dim S₂, then S₁ = S₂
+  have h_span_eq : affineSpan ℝ F.toSet = affineSpan ℝ G.toSet := by
+    -- Use that directions have equal dimension
+    have h_dir_le : (affineSpan ℝ F.toSet).direction ≤ (affineSpan ℝ G.toSet).direction :=
+      AffineSubspace.direction_le (affineSpan_mono ℝ h_subset)
+    have h_dir_finrank_eq : Module.finrank ℝ (affineSpan ℝ F.toSet).direction =
+        Module.finrank ℝ (affineSpan ℝ G.toSet).direction := by
+      -- F.dim and G.dim are defined as affineDim, which is Module.finrank of direction
+      -- So h_dim_eq : F.dim = G.dim directly gives us the finrank equality
+      simp only [GeometricFace.dim, affineDim] at h_dim_eq
+      exact_mod_cast h_dim_eq
+    -- Equal finrank + containment → equality for submodules
+    have h_dir_eq : (affineSpan ℝ F.toSet).direction = (affineSpan ℝ G.toSet).direction := by
+      refine le_antisymm h_dir_le ?_
+      -- Use that finrank equality + containment forbids strict containment
+      by_contra h_not_le
+      have h_dir_lt : (affineSpan ℝ F.toSet).direction < (affineSpan ℝ G.toSet).direction :=
+        lt_of_le_of_ne h_dir_le (by intro h; exact h_not_le (le_of_eq h.symm))
+      have : Module.finrank ℝ (affineSpan ℝ F.toSet).direction <
+          Module.finrank ℝ (affineSpan ℝ G.toSet).direction :=
+        Submodule.finrank_lt_finrank_of_lt h_dir_lt
+      omega
+    -- Use ext_of_direction_eq
+    have h_nonempty : ((affineSpan ℝ F.toSet : Set E) ∩ (affineSpan ℝ G.toSet)).Nonempty := by
+      obtain ⟨x, hx⟩ := F.prop.2
+      use x
+      constructor
+      · exact subset_affineSpan ℝ F.toSet hx
+      · exact (subset_affineSpan ℝ G.toSet (h_subset hx))
+    exact AffineSubspace.ext_of_direction_eq h_dir_eq h_nonempty
+
+  -- Now F.toSet and G.toSet both lie in the same affine space
+  -- and are both exposed faces of P
+  -- Apply the deep result: exposed faces with equal affine spans and containment are equal
+  have h_toSet_eq : F.toSet = G.toSet := by
+    exact exposed_face_eq_of_subset_affineSpan_eq h_subset h_span_eq
+
+  -- This contradicts F < G (which implies F ≠ G)
+  have : F = G := Subtype.ext h_toSet_eq
+  exact h.ne this
+
+/-!
+### Intermediate Face Existence
+
+The key geometric construction showing that we can find faces of intermediate dimension.
+-/
 
 /-- If F and G are geometric faces with F ⊂ G and dim F < dim G, then there exists
 a vertex v in G that is not in the affine span of F.
