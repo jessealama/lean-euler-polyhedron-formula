@@ -113,7 +113,7 @@ a vertex v in G that is not in the affine span of F.
 This is a key lemma for constructing intermediate faces. -/
 theorem exists_vertex_not_in_affineSpan {P : ConvexPolyhedron E}
     {F G : GeometricFace P}
-    (hFG : F < G)
+    (_hFG : F < G)
     (hdim : F.dim < G.dim) :
     ∃ v ∈ G.toSet ∩ (P.vertices : Set E), v ∉ affineSpan ℝ F.toSet := by
   -- Proof by contradiction
@@ -246,7 +246,8 @@ and each of those sets is finite by geometric_k_faces_finite. -/
 theorem geometricFaceInterval_finite (P : ConvexPolyhedron E) (F G : GeometricFace P) :
     (P.geometricFaceInterval F G).Finite := by
   -- The interval is a subset of the union of k-faces for k ∈ (F.dim, G.dim)
-  have h_subset : P.geometricFaceInterval F G ⊆ ⋃ k ∈ Set.Ioo F.dim G.dim, {H : GeometricFace P | H.dim = k} := by
+  have h_subset : P.geometricFaceInterval F G ⊆
+      ⋃ k ∈ Set.Ioo F.dim G.dim, {H : GeometricFace P | H.dim = k} := by
     intro H ⟨hFH, hHG⟩
     simp only [Set.mem_iUnion, Set.mem_setOf_eq, Set.mem_Ioo]
     use H.dim
@@ -274,7 +275,7 @@ def geometricIntermediateFaces (P : ConvexPolyhedron E) (F G : GeometricFace P) 
 intermediate dimension -/
 theorem geometricFaceInterval_eq_intermediateFaces {P : ConvexPolyhedron E}
     {F G : GeometricFace P}
-    (hlt : F < G) (hcodim2 : G.dim = F.dim + 2) :
+    (_hlt : F < G) (hcodim2 : G.dim = F.dim + 2) :
     P.geometricFaceInterval F G = P.geometricIntermediateFaces F G := by
   ext H
   simp only [geometricFaceInterval, geometricIntermediateFaces, Set.Ioo, Set.mem_setOf_eq]
@@ -304,7 +305,7 @@ omit [FiniteDimensional ℝ E] in
 there are exactly 2 intermediate geometric faces. In ZMod 2, this is 0. -/
 theorem geometric_intermediate_count_eq_zero_mod_two (P : ConvexPolyhedron E)
     (F G : GeometricFace P)
-    (h_lt : F < G) (h_dim : G.dim = F.dim + 2) :
+    (_h_lt : F < G) (_h_dim : G.dim = F.dim + 2) :
     (2 : ZMod 2) = 0 := by
   decide
 
