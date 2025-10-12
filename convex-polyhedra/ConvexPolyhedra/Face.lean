@@ -551,6 +551,19 @@ instance : CoeOut (GeometricFace P) (Set E) where
 noncomputable def dim (F : GeometricFace P) : ℤ :=
   affineDim ℝ F.toSet
 
+omit [FiniteDimensional ℝ E] in
+/-- A geometric face is convex.
+
+This follows from the fact that exposed faces of convex sets are convex.
+Since F is an exposed face of the convex polyhedron P, F is convex. -/
+theorem convex (F : GeometricFace P) : Convex ℝ F.toSet := by
+  -- F is exposed in P (by definition of GeometricFace)
+  have h_exposed : IsExposed ℝ (P : Set E) F.toSet := F.prop.1
+  -- P is convex (polyhedra are convex by Polyhedron.convex)
+  have h_P_convex : Convex ℝ (P : Set E) := P.convex
+  -- Apply IsExposed.convex
+  exact h_exposed.convex h_P_convex
+
 /-- Convert a Face to a GeometricFace -/
 noncomputable def ofFace (F : Face P) (hne : F.toSet.Nonempty) : GeometricFace P :=
   ⟨F.toSet, F.isExposed, hne⟩
