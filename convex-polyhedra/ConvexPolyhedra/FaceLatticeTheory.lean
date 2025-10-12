@@ -9,6 +9,7 @@ import Mathlib.Analysis.Convex.Intrinsic
 import Mathlib.LinearAlgebra.AffineSpace.FiniteDimensional
 import Mathlib.LinearAlgebra.AffineSpace.Pointwise
 import ConvexPolyhedra.Face
+import ConvexPolyhedra.RelativeInterior
 
 /-!
 # Face Lattice Theory for Convex Polyhedra
@@ -70,149 +71,29 @@ instance {P : ConvexPolyhedron E} : PartialOrder (GeometricFace P) where
     have : F.val = G.val := Set.Subset.antisymm hFG hGF
     exact Subtype.ext this
 
-/-!
-### Basic Dimension Properties
-
-These establish that dimension is monotone with respect to face containment.
--/
-
-/-- Affine dimension is monotone with respect to inclusion in affine spans.
-
-If s ⊆ affineSpan ℝ t, then affineDim ℝ s ≤ affineDim ℝ t.
-
-This follows from the fact that affineSpan is monotone and idempotent, combined with
-the relationship between affine dimension and the dimension of the direction submodule. -/
-theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan ℝ t) :
-    affineDim ℝ s ≤ affineDim ℝ t := by
-  -- Use affineSpan_mono to get affineSpan ℝ s ≤ affineSpan ℝ (affineSpan ℝ t)
-  have h1 : affineSpan ℝ s ≤ affineSpan ℝ (affineSpan ℝ t) := affineSpan_mono ℝ h
-  -- Use idempotence: affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t
-  have h2 : affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t := AffineSubspace.affineSpan_coe _
-  -- Combine to get affineSpan ℝ s ≤ affineSpan ℝ t
-  have h3 : affineSpan ℝ s ≤ affineSpan ℝ t := h2 ▸ h1
-  -- Apply direction_le to get direction ordering
-  have h4 : (affineSpan ℝ s).direction ≤ (affineSpan ℝ t).direction :=
-    AffineSubspace.direction_le h3
-  -- Use finrank monotonicity on submodules
-  -- affineDim is defined as Module.finrank of the direction
-  simp only [affineDim]
-  exact_mod_cast Submodule.finrank_mono h4
-
-/-- A nonempty convex set has nonempty intrinsic interior (relative interior).
-
-The intrinsic interior (also called relative interior) of a set is its interior when viewed
-as a subset of its affine span. This is a fundamental theorem in convex analysis.
-
-This is an alias for the existing Mathlib theorem `Set.Nonempty.intrinsicInterior`. -/
-theorem convex_intrinsicInterior_nonempty {s : Set E} (hs_conv : Convex ℝ s) (hs_ne : s.Nonempty) :
-    (intrinsicInterior ℝ s).Nonempty :=
-  hs_ne.intrinsicInterior hs_conv
-
-/-- Translation preserves affine dimension (via pointwise vadd).
-
-For any set s and vector v, translating s by v preserves affine dimension.
-This is because translation is an affine equivalence that preserves affine structure.
-
-This uses `AffineSubspace.pointwise_vadd_span` and `AffineSubspace.pointwise_vadd_direction`
-from Mathlib to show that translation preserves affine spans and their directions. -/
-theorem affineDim_vadd (v : E) (s : Set E) :
-    affineDim ℝ (v +ᵥ s) = affineDim ℝ s := by
-  -- affineSpan (v +ᵥ s) = v +ᵥ affineSpan s (by pointwise_vadd_span)
-  have h_span : affineSpan ℝ (v +ᵥ s) = v +ᵥ affineSpan ℝ s :=
-    (AffineSubspace.pointwise_vadd_span (k := ℝ) (V := E) (P := E) v s).symm
-  -- direction (v +ᵥ S) = S.direction for any affine subspace S
-  have h_dir : (v +ᵥ affineSpan ℝ s).direction = (affineSpan ℝ s).direction :=
-    AffineSubspace.pointwise_vadd_direction v (affineSpan ℝ s)
-  -- Combine: affineDim is the finrank of the direction
-  simp only [affineDim]
-  rw [h_span, h_dir]
-
-/-- Translation preserves affine dimension (via vsub/negation).
-
-For any set s and vector v, we have affineDim((-v) +ᵥ s) = affineDim(s).
-This follows immediately from affineDim_vadd. -/
-theorem affineDim_neg_vadd (v : E) (s : Set E) :
-    affineDim ℝ ((-v) +ᵥ s) = affineDim ℝ s :=
-  affineDim_vadd (-v) s
-
-/-- Translation preserves affine dimension (via image under subtraction map).
-
-For any set s and vector v, translating s by the map y ↦ y - v preserves affine dimension.
-This is a corollary of affineDim_vadd since (y - v) = y + (-v) = (-v) +ᵥ y. -/
-theorem affineDim_image_sub (v : E) (s : Set E) :
-    affineDim ℝ ((fun y => y - v) '' s) = affineDim ℝ s := by
-  -- The image {y - v | y ∈ s} equals (-v) +ᵥ s
-  have h_eq : (fun y => y - v) '' s = (-v) +ᵥ s := by
-    ext x
-    simp only [Set.mem_image, Set.mem_vadd_set, sub_eq_add_neg]
-    constructor
-    · intro ⟨y, hy, h⟩
-      exact ⟨y, hy, by rw [add_comm] at h; exact h⟩
-    · intro ⟨y, hy, h⟩
-      exact ⟨y, hy, by rw [add_comm]; exact h⟩
-  rw [h_eq]
-  exact affineDim_neg_vadd v s
-
-/-- **Key theorem about convex sets with full affine dimension.**
-
-If s and t are convex sets with:
-- s ⊆ t ⊆ affineSpan s
-- affineDim s = affineDim t = affineDim (affineSpan s)
-
-Then s = t.
-
-**Intuition**: The condition affineDim s = affineDim (affineSpan s) means s has
-"full dimension" in its affine hull. Such a set cannot be properly extended within
-that affine space without increasing dimension. Proper containment s ⊂ t while
-maintaining equal dimensions and equal affine spans is impossible.
-
-**References**:
-- Rockafellar, "Convex Analysis" (1970), Theorem 6.2 and Corollary 6.8.2
-- Schneider, "Convex Bodies" (2014), Theorem 1.1.4 (relative interior characterization)
-- Grünbaum, "Convex Polytopes" (2003), Theorem 2.1
-
-**Note**: This is a deep theorem that is not currently in Mathlib and deserves
-standalone formalization. -/
-theorem convex_eq_of_subset_affineSpan_same_dim_full {s t : Set E}
-    (hs_conv : Convex ℝ s) (ht_conv : Convex ℝ t)
-    (h_subset : s ⊆ t)
-    (h_in_span : t ⊆ affineSpan ℝ s)
-    (h_dim_eq : affineDim ℝ s = affineDim ℝ t)
-    (h_full : affineDim ℝ s = affineDim ℝ (affineSpan ℝ s : Set E)) :
-    s = t := by
-  sorry
-
 /-- If s ⊆ t ⊆ affineSpan s with equal affine dimensions, then t ⊆ s.
 
-This follows from the more general theorem about convex sets with full affine dimension.
+This follows from the theorem about full-dimensional convex sets being relatively closed.
+See `ConvexPolyhedra.RelativeInterior` for the underlying theory.
 
 **References**:
 - Rockafellar, "Convex Analysis" (1970), Theorem 6.2
 - Ziegler, "Lectures on Polytopes" (1995), Proposition 2.4 -/
 theorem subset_of_subset_affineSpan_same_dim {s t : Set E}
     (hs_conv : Convex ℝ s) (ht_conv : Convex ℝ t)
+    (hs_ne : s.Nonempty)
     (h_subset : s ⊆ t)
     (h_in_span : t ⊆ affineSpan ℝ s)
     (h_dim_eq : affineDim ℝ s = affineDim ℝ t) :
     t ⊆ s := by
-  -- Show affineSpan s = affineSpan t from containment conditions
-  have h_span_eq : affineSpan ℝ s = affineSpan ℝ t := by
-    have h1 : affineSpan ℝ s ≤ affineSpan ℝ t := affineSpan_mono ℝ h_subset
-    have h2 : affineSpan ℝ t ≤ affineSpan ℝ s := by
-      rw [affineSpan_le]
-      exact h_in_span
-    exact le_antisymm h1 h2
-
   -- Show that s has full dimension in its affine span
   have h_full : affineDim ℝ s = affineDim ℝ (affineSpan ℝ s : Set E) := by
     simp only [affineDim]
-    -- affineSpan (affineSpan s) = affineSpan s by idempotence
     rw [AffineSubspace.affineSpan_coe]
 
-  -- Apply the key theorem
-  have h_eq : s = t := by
-    exact convex_eq_of_subset_affineSpan_same_dim_full
-      hs_conv ht_conv h_subset h_in_span h_dim_eq h_full
+  -- Apply the key theorem from RelativeInterior module
+  have h_eq : s = t :=
+    convex_eq_of_subset_affineSpan_same_dim_full hs_conv ht_conv hs_ne h_subset h_in_span h_dim_eq h_full
 
   exact h_eq ▸ Set.Subset.refl s
 
@@ -263,9 +144,10 @@ theorem exposed_face_eq_of_subset_affineSpan_eq {P : ConvexPolyhedron E}
     --   - G ⊆ affineSpan F (hG_in_spanF, and affineSpan F = affineSpan G)
     --   - affineDim F = affineDim G (h_dim_eq)
     --   - F and G are both convex (hF_conv, hG_conv)
+    --   - F is nonempty (from GeometricFace definition)
     --
     -- Apply the key lemma: if F ⊆ G ⊆ affineSpan F with equal dimensions, then G ⊆ F
-    exact subset_of_subset_affineSpan_same_dim hF_conv hG_conv h_subset hG_in_spanF h_dim_eq
+    exact subset_of_subset_affineSpan_same_dim hF_conv hG_conv F.prop.2 h_subset hG_in_spanF h_dim_eq
 
   exact Set.Subset.antisymm h_subset this
 
