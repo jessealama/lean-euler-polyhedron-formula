@@ -241,3 +241,29 @@ theorem convex_eq_of_subset_affineSpan_same_dim_full {s t : Set E}
   rw [← h_s_closed]
 
   sorry
+
+/-- If s ⊆ t ⊆ affineSpan s with equal affine dimensions, then t ⊆ s.
+
+This follows from the theorem about full-dimensional convex sets being relatively closed.
+
+**References**:
+- Rockafellar, "Convex Analysis" (1970), Theorem 6.2
+- Ziegler, "Lectures on Polytopes" (1995), Proposition 2.4 -/
+theorem subset_of_subset_affineSpan_same_dim {s t : Set E}
+    (hs_conv : Convex ℝ s) (ht_conv : Convex ℝ t)
+    (hs_ne : s.Nonempty)
+    (h_subset : s ⊆ t)
+    (h_in_span : t ⊆ affineSpan ℝ s)
+    (h_dim_eq : affineDim ℝ s = affineDim ℝ t) :
+    t ⊆ s := by
+  -- Show that s has full dimension in its affine span
+  have h_full : affineDim ℝ s = affineDim ℝ (affineSpan ℝ s : Set E) := by
+    simp only [affineDim]
+    rw [AffineSubspace.affineSpan_coe]
+
+  -- Apply the key theorem
+  have h_eq : s = t :=
+    convex_eq_of_subset_affineSpan_same_dim_full hs_conv ht_conv hs_ne h_subset h_in_span
+      h_dim_eq h_full
+
+  exact h_eq ▸ Set.Subset.refl s
