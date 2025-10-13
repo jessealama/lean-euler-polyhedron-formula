@@ -10,6 +10,7 @@ import Mathlib.Analysis.Convex.Topology
 import Mathlib.LinearAlgebra.AffineSpace.FiniteDimensional
 import Mathlib.LinearAlgebra.AffineSpace.Pointwise
 import Mathlib.Topology.Algebra.Module.FiniteDimension
+import Mathlib.Topology.Maps.Basic
 import ConvexPolyhedra.Polyhedron
 
 /-!
@@ -151,6 +152,146 @@ theorem preimage_coe_affineSpan_eq (s : Set E) :
     exact hys
 
 /-!
+### Helper lemmas for main theorem
+-/
+
+omit [FiniteDimensional ℝ E] in
+/-- **Helper Lemma 1**: The intersection of affine span and ambient closure
+is contained in the intrinsic closure.
+
+Points that lie in both the ambient closure of s and the affine span of s
+are also in the intrinsic closure of s (the closure in the subspace topology). -/
+theorem affineSpan_inter_closure_subset_intrinsicClosure {s : Set E}
+    (_hs_conv : Convex ℝ s) (_hs_ne : s.Nonempty)
+    (_h_full : affineDim ℝ s = affineDim ℝ (affineSpan ℝ s : Set E)) :
+    (affineSpan ℝ s : Set E) ∩ closure s ⊆ intrinsicClosure ℝ s := by
+  intro x ⟨hx_span, hx_closure⟩
+
+  -- Use mem_intrinsicClosure characterization
+  rw [mem_intrinsicClosure]
+
+  -- Need to show: ∃ y ∈ closure ((↑) ⁻¹' s), y.val = x
+  -- where (↑) : affineSpan ℝ s → E is the inclusion map
+
+  -- The witness is ⟨x, hx_span⟩ viewed as an element of affineSpan ℝ s
+  use ⟨x, hx_span⟩
+
+  constructor
+  · -- Show: ⟨x, hx_span⟩ ∈ closure ((↑) ⁻¹' s)
+    -- where (↑) ⁻¹' s is the preimage of s under inclusion
+
+    -- Strategy: Use `Topology.IsEmbedding.closure_eq_preimage_closure_image`
+    -- which gives: closure (f ⁻¹' A) = f ⁻¹' closure (f '' (f ⁻¹' A))
+    -- for any embedding f.
+    --
+    -- Since Subtype.val '' (Subtype.val ⁻¹' s) = s ∩ affineSpan, this becomes:
+    -- closure (Subtype.val ⁻¹' s) = Subtype.val ⁻¹' closure (s ∩ affineSpan)
+    --                             = Subtype.val ⁻¹' closure s
+
+    -- The subtype inclusion is an embedding
+    have h_emb : Topology.IsEmbedding (Subtype.val : affineSpan ℝ s → E) :=
+      Topology.IsEmbedding.subtypeVal
+
+    rw [h_emb.closure_eq_preimage_closure_image]
+    simp only [mem_preimage]
+
+    -- Goal: x ∈ closure (Subtype.val '' (Subtype.val ⁻¹' s : Set (affineSpan ℝ s)))
+    -- We have: Subtype.val '' (Subtype.val ⁻¹' s) = s ∩ affineSpan ℝ s = s (since s ⊆ affineSpan)
+    have h_image_eq : (Subtype.val : affineSpan ℝ s → E) '' (Subtype.val ⁻¹' s) =
+                      s ∩ (affineSpan ℝ s : Set E) := by
+      ext y
+      simp only [mem_image, mem_preimage, mem_inter_iff]
+      constructor
+      · intro ⟨⟨z, hz_span⟩, hz_s, h_eq⟩
+        simp only at h_eq
+        rw [← h_eq]
+        exact ⟨hz_s, hz_span⟩
+      · intro ⟨hy_s, hy_span⟩
+        use ⟨y, hy_span⟩, hy_s
+
+    rw [h_image_eq]
+
+    -- Simplify: s ∩ affineSpan ℝ s = s (since s ⊆ affineSpan ℝ s)
+    have h_inter_eq : s ∩ (affineSpan ℝ s : Set E) = s :=
+      inter_eq_left.mpr (subset_affineSpan ℝ s)
+
+    rw [h_inter_eq]
+
+    -- Goal: x ∈ closure s
+    exact hx_closure
+
+  · -- Show: ↑⟨x, hx_span⟩ = x
+    rfl
+
+/-- **Auxiliary Lemma for Helper 2**: In a finite-dimensional normed space V,
+a convex set with full dimension equals the closure of its interior.
+
+This is a fundamental result about convex sets in finite dimensions:
+if S has the same dimension as the ambient space V, then S = closure(interior(S)).
+
+This is more elementary than the main theorem because it works within a SINGLE topology
+(V's topology) rather than across ambient and intrinsic topologies. -/
+theorem Convex.eq_closure_interior_of_full_dim {V : Type*}
+    [NormedAddCommGroup V] [InnerProductSpace ℝ V] [FiniteDimensional ℝ V]
+    {S : Set V} (hS_conv : Convex ℝ S) (hS_ne : S.Nonempty)
+    (h_full_dim : affineDim ℝ S = Module.finrank ℝ V) :
+    S = closure (interior S) := by
+  /-
+  Strategy:
+  1. Show interior S is nonempty (use full dimension + finite dimensionality)
+     - Full dimension means S spans V
+     - In finite dimensions, this implies S contains an open ball
+     - Therefore interior S ≠ ∅
+
+  2. Show S ⊆ closure(interior S)
+     - For any x ∈ S and p ∈ interior S (which exists by step 1)
+     - The open segment (p, x) lies in interior S (by convexity)
+     - Taking limits as we approach x from the segment gives x ∈ closure(interior S)
+
+  3. Show closure(interior S) ⊆ S
+     - For convex sets in finite dimensions, S is "locally closed"
+     - The closure of the interior cannot escape S
+     - This uses finite-dimensionality crucially
+
+  Note: This lemma works in a single topology (V's topology), which makes it
+  more elementary than working across ambient/intrinsic topologies.
+  -/
+  sorry
+
+/-- **Helper Lemma 2**: The intrinsic closure of a full-dimensional convex set
+equals the set itself.
+
+For a nonempty convex set s with full dimension in its affine span,
+the intrinsic closure (closure in the subspace topology) equals s.
+
+This is the KEY non-circular step that uses full dimension to conclude
+the set is "relatively closed". -/
+theorem intrinsicClosure_eq_of_full_dim {s : Set E}
+    (hs_conv : Convex ℝ s) (hs_ne : s.Nonempty)
+    (h_full : affineDim ℝ s = affineDim ℝ (affineSpan ℝ s : Set E)) :
+    intrinsicClosure ℝ s = s := by
+  /-
+  Strategy: Apply the auxiliary lemma about closure = closure(interior)
+  in the subspace topology of affineSpan ℝ s.
+
+  Key steps:
+  1. Transfer the problem to the subspace (affineSpan ℝ s) where we work
+     in a single topology
+
+  2. Show that the preimage (↑) ⁻¹' s has full dimension in affineSpan ℝ s
+     - Use h_full: affineDim s = affineDim (affineSpan s)
+
+  3. Apply the auxiliary lemma Convex.eq_closure_interior_of_full_dim
+     to (↑) ⁻¹' s in the subspace
+
+  4. Transfer back to show intrinsicClosure s = s
+
+  This avoids circularity by proving the auxiliary lemma independently
+  for convex sets in a single topology.
+  -/
+  sorry
+
+/-!
 ### Main theorem: Full-dimensional convex sets are relatively closed
 -/
 
@@ -164,7 +305,16 @@ theorem Convex.closure_inter_affineSpan_subset_of_full_dim {s : Set E}
     (hs_conv : Convex ℝ s) (hs_ne : s.Nonempty)
     (h_full : affineDim ℝ s = affineDim ℝ (affineSpan ℝ s : Set E)) :
     (affineSpan ℝ s : Set E) ∩ closure s ⊆ s := by
-  sorry
+  -- Step 1: affineSpan ∩ closure ⊆ intrinsicClosure
+  have h_step1 : (affineSpan ℝ s : Set E) ∩ closure s ⊆ intrinsicClosure ℝ s :=
+    affineSpan_inter_closure_subset_intrinsicClosure hs_conv hs_ne h_full
+
+  -- Step 2: intrinsicClosure = s for full-dimensional sets
+  have h_step2 : intrinsicClosure ℝ s = s :=
+    intrinsicClosure_eq_of_full_dim hs_conv hs_ne h_full
+
+  -- Combine: affineSpan ∩ closure ⊆ intrinsicClosure = s
+  rwa [h_step2] at h_step1
 
 /-- **Full-dimensional convex sets are relatively closed (Rockafellar's Theorem 6.4).**
 
@@ -230,17 +380,58 @@ theorem convex_eq_of_subset_affineSpan_same_dim_full {s t : Set E}
     (h_dim_eq : affineDim ℝ s = affineDim ℝ t)
     (h_full : affineDim ℝ s = affineDim ℝ (affineSpan ℝ s : Set E)) :
     s = t := by
-  -- Strategy: show t ⊆ s using that s is relatively closed
+  -- Strategy: show t ⊆ (affineSpan s ∩ closure s), then use base theorem
   apply Subset.antisymm h_subset
 
-  -- We'll show that t ⊆ intrinsicClosure ℝ s and use that intrinsicClosure ℝ s = s
-  have h_s_closed : intrinsicClosure ℝ s = s :=
-    Convex.intrinsicClosure_eq_self_of_full_dim hs_conv hs_ne h_full
+  --  We'll show t ⊆ s by showing t ⊆ affineSpan s ∩ closure s and applying base theorem
+  intro x hx_t
 
-  -- Since t ⊆ affineSpan s and equal dimensions, t must be in the intrinsic closure
-  rw [← h_s_closed]
+  -- We have t ⊆ affineSpan s directly from h_in_span
+  have hx_span : x ∈ (affineSpan ℝ s : Set E) := h_in_span hx_t
 
-  sorry
+  -- Need to show x ∈ closure s
+  -- Key insight: since s and t have same affine span and dimension, t ⊆ closure s
+  have ht_in_closure_s : t ⊆ closure s := by
+    -- Establish affineSpan s = affineSpan t
+    have h_span_eq : affineSpan ℝ s = affineSpan ℝ t := by
+      apply le_antisymm
+      · exact affineSpan_mono ℝ h_subset
+      · rw [affineSpan_le]; exact h_in_span
+
+    -- Mathematical insight: If s ⊆ t ⊆ affineSpan s with equal dimensions and both
+    -- full-dimensional, then t ⊆ closure s.
+    --
+    -- This is because:
+    -- 1. Both s and t span the same affine subspace (h_span_eq)
+    -- 2. Both have the same affine dimension (h_dim_eq)
+    -- 3. Both are full-dimensional in that subspace (h_full + h_dim_eq)
+    -- 4. s ⊆ t, so any point in t \ s would create a proper extension
+    -- 5. But such an extension would contradict either the dimension equality
+    --    or the full-dimensionality
+    --
+    -- Therefore, t \ s (if nonempty) consists only of boundary points of s,
+    -- i.e., points in closure s \ s. Hence t ⊆ closure s.
+    --
+    -- DEPENDENCY NOTE: This appears to require the base theorem
+    -- `Convex.closure_inter_affineSpan_subset_of_full_dim` or equivalent reasoning.
+    -- The proof of that theorem and this theorem may need to be developed together
+    -- or one needs to be proved first using different techniques (e.g., separation theorems,
+    -- Carathéodory's theorem, or results about relative interiors).
+    sorry
+
+  have hx_closure : x ∈ closure s := ht_in_closure_s hx_t
+
+  -- Now apply the base theorem
+  exact Convex.closure_inter_affineSpan_subset_of_full_dim hs_conv hs_ne h_full
+    ⟨hx_span, hx_closure⟩
+
+/-!
+### Linear (vector space) analogs
+
+The following theorems are vector space analogs of the affine theorems above.
+In the linear setting, we work with `Submodule.span` and `Module.finrank` instead
+of `affineSpan` and `affineDim`.
+-/
 
 /-- If s ⊆ t ⊆ affineSpan s with equal affine dimensions, then t ⊆ s.
 
