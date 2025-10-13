@@ -457,7 +457,8 @@ theorem mem_intrinsicInterior_iff_extension
   · -- (⇐) Backward direction: extension property → z ∈ ri s
     intro h_ext
 
-    -- By Theorem 6.2, intrinsicInterior s is nonempty for nonempty convex s
+    -- By Theorem 6.2 (Rockafellar), intrinsicInterior s is nonempty for nonempty convex s
+    -- This is available in Mathlib as Set.Nonempty.intrinsicInterior
     have h_ri_ne : (intrinsicInterior ℝ s).Nonempty :=
       hs_ne.intrinsicInterior hs
 
