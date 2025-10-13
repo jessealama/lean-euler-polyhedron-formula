@@ -581,3 +581,224 @@ theorem subset_of_subset_affineSpan_same_dim {s t : Set E}
       h_dim_eq h_full
 
   exact h_eq ▸ Set.Subset.refl s
+
+/-!
+### Rockafellar's Reduction Technique
+
+This section formalizes Rockafellar's proof technique from "Convex Analysis" (1970), Section 6,
+pages 44-45. The key observation is that properties of convex sets that are preserved under
+affine equivalences can be reduced to the case where the set has full dimension in its
+ambient space.
+
+**Rockafellar's observation** (pages 44-45):
+
+> "Closures and relative interiors are preserved under translations and more generally under
+> any one-to-one affine transformation of Rⁿ onto itself. [...] It is often possible in this
+> manner to reduce a question about general convex sets to the case where the convex set is
+> of full dimension, i.e. has the whole space as its affine hull."
+
+**The technique works as follows:**
+- To prove a property P of an m-dimensional convex set C in Rⁿ
+- Find an affine equivalence T mapping aff(C) to a coordinate subspace L ≅ Rᵐ
+- Prove P for T(C), which is full-dimensional in L
+- Transfer back using T⁻¹
+
+**Key simplification:** In the full-dimensional case, relative interior = ordinary interior,
+which often makes proofs much simpler.
+
+**Usage pattern:** When proving Theorem 6.1, Rockafellar writes:
+> "In view of the preceding remark, we can limit attention to the case where C is
+> n-dimensional, so that ri C = int C."
+-/
+
+section RockafellarReduction
+
+variable {E₁ E₂ : Type*}
+  [NormedAddCommGroup E₁] [InnerProductSpace ℝ E₁] [FiniteDimensional ℝ E₁]
+  [NormedAddCommGroup E₂] [InnerProductSpace ℝ E₂] [FiniteDimensional ℝ E₂]
+
+/-!
+#### Affine equivalences preserve structure
+
+We first establish that `AffineEquiv` (bijective affine maps) preserve the key
+structures we need. These are the building blocks for the reduction technique.
+-/
+
+/-- Affine equivalences preserve affine spans.
+
+This is a fundamental property: if φ is a bijective affine map, then the image of
+the affine span equals the affine span of the image. -/
+theorem AffineEquiv.map_affineSpan (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set E₁) :
+    φ.toAffineMap '' (affineSpan ℝ s : Set E₁) = (affineSpan ℝ (φ '' s) : Set E₂) := by
+  sorry
+
+/-- Affine equivalences preserve affine dimension.
+
+This follows from the fact that affine equivalences preserve affine spans
+and induce linear equivalences on the direction submodules. -/
+theorem AffineEquiv.affineDim_image (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set E₁) :
+    affineDim ℝ (φ '' s) = affineDim ℝ s := by
+  sorry
+
+/-- Affine equivalences preserve relative interiors (intrinsic interiors).
+
+**Key fact**: In finite-dimensional spaces, affine equivalences are homeomorphisms
+(via `AffineEquiv.toHomeomorphOfFiniteDimensional`), and homeomorphisms preserve
+interior in the subspace topology. -/
+theorem AffineEquiv.image_intrinsicInterior (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set E₁) :
+    intrinsicInterior ℝ (φ '' s) = φ '' intrinsicInterior ℝ s := by
+  sorry
+
+/-- Affine equivalences preserve relative closures (intrinsic closures). -/
+theorem AffineEquiv.image_intrinsicClosure (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set E₁) :
+    intrinsicClosure ℝ (φ '' s) = φ '' intrinsicClosure ℝ s := by
+  sorry
+
+/-!
+#### The Reduction Theorem
+
+This is the main theorem that formalizes Rockafellar's methodological observation.
+-/
+
+/-- **Rockafellar's Reduction to Full-Dimensional Case**
+
+This theorem formalizes Rockafellar's observation: **To prove a property P of convex sets,
+it suffices to:**
+1. Show P is preserved under affine equivalences
+2. Prove P for all full-dimensional convex sets
+
+**Why this works:**
+- For any m-dimensional convex set C in Rⁿ, there exists an affine equivalence T
+  mapping aff(C) to a coordinate subspace L ≅ Rᵐ
+- In L, the set T(C) is full-dimensional
+- Apply the full-dimensional case to T(C)
+- Transfer back using T⁻¹
+
+**Key insight:** In the full-dimensional case, relative interior = ordinary interior,
+which often makes proofs much simpler.
+
+**Usage pattern:**
+```lean
+theorem my_property (C : Set E) (hC : Convex ℝ C) : P C := by
+  apply convex_property_by_reduction_to_full_dim
+  · -- Show P is preserved under affine equivalences
+    intro E₁ E₂ _ _ _ _ _ _ φ s hs
+    sorry
+  · -- Prove P for full-dimensional case
+    intro E _ _ _ s hs h_full
+    -- Here: intrinsicInterior s = interior s (much simpler!)
+    sorry
+```
+
+**References**:
+- Rockafellar, "Convex Analysis" (1970), Section 6, pages 44-45
+-/
+theorem convex_property_by_reduction_to_full_dim
+    {P : ∀ {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+          [FiniteDimensional ℝ E], Set E → Prop}
+    -- (1) P is preserved under affine equivalences
+    (h_affine_equiv : ∀ {E₁ E₂ : Type*}
+                       [NormedAddCommGroup E₁] [InnerProductSpace ℝ E₁]
+                       [FiniteDimensional ℝ E₁]
+                       [NormedAddCommGroup E₂] [InnerProductSpace ℝ E₂]
+                       [FiniteDimensional ℝ E₂]
+                       (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set E₁),
+                     P s → P (φ '' s))
+    -- (2) P holds for all full-dimensional convex sets
+    (h_full_dim : ∀ {E : Type*}
+                    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+                    [FiniteDimensional ℝ E] (s : Set E),
+                  Convex ℝ s →
+                  affineDim ℝ s = Module.finrank ℝ E →
+                  P s)
+    -- Then P holds for all convex sets
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [FiniteDimensional ℝ E]
+    (C : Set E)
+    (hC : Convex ℝ C) :
+    P C := by
+  /-
+  Proof strategy:
+
+  Case 1: C is already full-dimensional
+    Apply h_full_dim directly
+
+  Case 2: C has dimension m < n (where n = dim E)
+    Step 1: Construct affine equivalence T : E → E such that
+            T(aff C) = coordinate subspace L ≅ Rᵐ
+            (This exists by Mathlib's AffineSubspace theory)
+
+    Step 2: Consider T(C) ⊆ L
+            Show T(C) is full-dimensional in L
+
+    Step 3: Regard L as a copy of Rᵐ
+            Apply h_full_dim to T(C) in this space
+
+    Step 4: Transfer result back to C using T⁻¹ and h_affine_equiv
+
+  The key technical work is in Step 1 (finding T) and Step 3 (the
+  type-theoretic gymnastics of working in the subspace L).
+  -/
+  sorry
+
+/-- **Specialized version for intrinsic properties**
+
+Many properties of convex sets depend only on their intrinsic structure
+(relative interior, relative closure, affine dimension) rather than the
+embedding. For such properties, we can state a cleaner version using ↔. -/
+theorem convex_property_by_reduction_to_full_dim_intrinsic
+    {P : ∀ {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+          [FiniteDimensional ℝ E], Set E → Prop}
+    -- P depends only on intrinsic structure (preserved by affine equivalence)
+    (h_intrinsic : ∀ {E₁ E₂ : Type*}
+                     [NormedAddCommGroup E₁] [InnerProductSpace ℝ E₁]
+                     [FiniteDimensional ℝ E₁]
+                     [NormedAddCommGroup E₂] [InnerProductSpace ℝ E₂]
+                     [FiniteDimensional ℝ E₂]
+                     (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set E₁),
+                   P s ↔ P (φ '' s))
+    -- P holds for full-dimensional convex sets
+    (h_full_dim : ∀ {E : Type*}
+                    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+                    [FiniteDimensional ℝ E] (s : Set E),
+                  Convex ℝ s →
+                  affineDim ℝ s = Module.finrank ℝ E →
+                  P s)
+    -- Then P holds for all convex sets
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [FiniteDimensional ℝ E]
+    (C : Set E)
+    (hC : Convex ℝ C) :
+    P C := by
+  apply convex_property_by_reduction_to_full_dim
+  · intro E₁ E₂ _ _ _ _ _ _ φ s hs
+    exact (h_intrinsic φ s).mp hs
+  · exact h_full_dim
+
+/-!
+#### Helper: Full-dimensional sets have simpler topology
+-/
+
+/-- In a full-dimensional convex set, the relative interior equals the ordinary interior.
+
+This is the key simplification that makes the reduction technique so powerful. -/
+theorem intrinsicInterior_eq_interior_of_full_dim
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    {s : Set E} (hs : Convex ℝ s) (h_full : affineDim ℝ s = Module.finrank ℝ E) :
+    intrinsicInterior ℝ s = interior s := by
+  /-
+  Since s has full dimension, affineSpan s = ⊤ (the whole space).
+  The intrinsic interior is the interior in the subspace topology of affineSpan s.
+  When affineSpan s = ⊤, the subspace topology equals the ambient topology.
+  Therefore intrinsicInterior s = interior s.
+  -/
+  sorry
+
+/-- In a full-dimensional convex set, the relative closure equals the ordinary closure. -/
+theorem intrinsicClosure_eq_closure_of_full_dim
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    {s : Set E} (hs : Convex ℝ s) (h_full : affineDim ℝ s = Module.finrank ℝ E) :
+    intrinsicClosure ℝ s = closure s := by
+  sorry
+
+end RockafellarReduction
