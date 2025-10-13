@@ -365,6 +365,128 @@ theorem Convex.intrinsicClosure_eq_self_of_full_dim {s : Set E}
   exact Convex.closure_inter_affineSpan_subset_of_full_dim hs_conv hs_ne h_full
 
 /-!
+### Rockafellar's Theorems 6.1 and 6.4: Characterizations of relative interior
+-/
+
+/-- **Rockafellar's Theorem 6.1 (intrinsic version)**: Convex combination of relative interior
+and relative closure stays in relative interior.
+
+For a convex set C, if x is in the relative interior and y is in the relative closure,
+then any convex combination (1-λ)x + λy with 0 ≤ λ < 1 remains in the relative interior.
+
+This is the intrinsic (relative) version of `Convex.combo_interior_closure_mem_interior`.
+
+**Proof strategy**:
+The proof works within the subspace topology of affineSpan ℝ s, where intrinsicInterior
+becomes the ordinary interior. We can then apply the ambient version and transfer back. -/
+theorem Convex.combo_intrinsicInterior_intrinsicClosure_mem_intrinsicInterior
+    {s : Set E} (hs : Convex ℝ s)
+    {x y : E} (hx : x ∈ intrinsicInterior ℝ s) (hy : y ∈ intrinsicClosure ℝ s)
+    {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t < 1) :
+    (1 - t) • x + t • y ∈ intrinsicInterior ℝ s := by
+  /-
+  Proof strategy (simplified):
+  The key insight is that intrinsicInterior and intrinsicClosure are defined
+  via the subspace topology. We can work directly with the convex combination
+  in the ambient space E, which is well-typed.
+
+  For a detailed proof, we would:
+  1. Show that the preimage under the subspace inclusion is convex
+  2. Apply the ambient version Convex.combo_interior_closure_mem_interior
+  3. Use the characterizations mem_intrinsicInterior and mem_intrinsicClosure
+
+  This requires careful handling of the affine subspace structure, which is
+  technically involved but conceptually straightforward.
+  -/
+  sorry
+
+/-- **Rockafellar's Theorem 6.4**: Characterization of relative interior points.
+
+A point z is in the relative interior of a nonempty convex set C if and only if
+every line segment from any point x ∈ C to z can be extended slightly beyond z
+while remaining in C.
+
+Formally: z ∈ ri C ⟺ (∀ x ∈ C, ∃ μ > 1, (1 - μ)x + μz ∈ C)
+
+**Proof strategy**:
+(⇒) If z ∈ ri C, use Theorem 6.1 to show line segments can be extended
+(⇐) If z satisfies the condition:
+    - By Theorem 6.2, ri C ≠ ∅, so pick some x ∈ ri C
+    - By hypothesis, ∃ μ > 1 with y := (1 - μ)x + μz ∈ C
+    - Rearrange: z = (1 - λ)x + λy where λ = μ⁻¹ ∈ (0, 1)
+    - By Theorem 6.1, z ∈ ri C
+
+**References**:
+- Rockafellar, "Convex Analysis" (1970), Theorem 6.4
+-/
+theorem mem_intrinsicInterior_iff_extension
+    {s : Set E} (hs : Convex ℝ s) (hs_ne : s.Nonempty) {z : E} :
+    z ∈ intrinsicInterior ℝ s ↔
+    ∀ x ∈ s, ∃ μ > 1, (1 - μ) • x + μ • z ∈ s := by
+  constructor
+
+  · -- (⇒) Forward direction: z ∈ ri s → extension property
+    intro hz x hx
+
+    -- We have z ∈ intrinsicInterior s and x ∈ s
+    -- Need to show: ∃ μ > 1 such that (1 - μ) • x + μ • z ∈ s
+
+    -- Key idea: Use Theorem 6.1 in reverse
+    -- Since z ∈ ri s, by taking any point in s, we can form a segment
+    -- The relative interior property guarantees we can extend beyond z
+
+    -- Since x ∈ s ⊆ closure s, and z ∈ intrinsicInterior s,
+    -- by Theorem 6.1, for any t ∈ [0, 1), we have (1-t)•z + t•x ∈ intrinsicInterior s ⊆ s
+
+    -- We want to show: ∃ μ > 1, (1 - μ)•x + μ•z ∈ s
+    -- Setting t close to 1, say t = 1 - ε for small ε > 0:
+    -- (1-t)•z + t•x = ε•z + (1-ε)•x ∈ s
+    -- Rearranging: ε•z + (1-ε)•x = (1 - (1-ε))•x + (1+ε-1)/(ε)•..
+    -- Actually, let's use μ = 1/(1-t) for t close to 1
+
+    -- Simpler: Take μ = 2, and we need to show (1-2)•x + 2•z = 2•z - x ∈ s
+    -- This is: z + (z - x) = z - (x - z)
+
+    -- By Theorem 6.1: (1-t)•x + t•z ∈ intrinsicInterior s for t ∈ [0,1)
+    -- Taking t → 1 doesn't quite work...
+
+    -- Let me use the contrapositive form:
+    -- If we can't extend, then z is on the boundary
+    sorry
+
+  · -- (⇐) Backward direction: extension property → z ∈ ri s
+    intro h_ext
+
+    -- By Theorem 6.2, intrinsicInterior s is nonempty for nonempty convex s
+    have h_ri_ne : (intrinsicInterior ℝ s).Nonempty :=
+      hs_ne.intrinsicInterior hs
+
+    -- Pick any point x in the relative interior
+    obtain ⟨x, hx⟩ := h_ri_ne
+
+    -- We have x ∈ intrinsicInterior s
+    -- By hypothesis h_ext with this x, since x ∈ intrinsicInterior s ⊆ s:
+    have hx_in_s : x ∈ s := intrinsicInterior_subset hx
+    obtain ⟨μ, hμ_gt_1, hy⟩ := h_ext x hx_in_s
+
+    -- hy states: (1 - μ) • x + μ • z ∈ s
+    -- We need to express z as a convex combination of x and this point
+
+    -- Since the algebra is getting complex with type inference,
+    -- let's use a more direct approach
+
+    -- From (1 - μ)•x + μ•z ∈ s and μ > 1, we can rearrange to get
+    -- z = (1 - 1/μ)•x + (1/μ)•((1 - μ)•x + μ•z)
+
+    -- The key insight: We need to show z ∈ intrinsicInterior s
+    -- by expressing it as a convex combination of x ∈ intrinsicInterior s
+    -- and a point in s (hence in intrinsicClosure s)
+
+    -- This requires careful algebraic manipulation that depends on
+    -- proper handling of the scalar μ as a real number
+    sorry
+
+/-!
 ### Applications and corollaries
 -/
 
