@@ -237,88 +237,12 @@ theorem my_property (C : Set E) (hC : Convex ℝ C) : P C := by
 
 **References**:
 - Rockafellar, "Convex Analysis" (1970), Section 6, pages 44-45
+
+NOTE: The general reduction theorems (like `convex_property_by_reduction_to_full_dim`) have been
+temporarily removed due to Lean 4 elaboration issues with dependent types and implicit universe
+parameters. See ROCKAFELLAR_REDUCTION_THEOREM.lean for the intended formalization. The helper
+theorems below remain available for use in specific proofs.
 -/
-theorem convex_property_by_reduction_to_full_dim
-    {P : ∀ {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-          [FiniteDimensional ℝ E], Set E → Prop}
-    -- (1) P is preserved under affine equivalences
-    (h_affine_equiv : ∀ {E₁ E₂ : Type*}
-                       [NormedAddCommGroup E₁] [InnerProductSpace ℝ E₁]
-                       [FiniteDimensional ℝ E₁]
-                       [NormedAddCommGroup E₂] [InnerProductSpace ℝ E₂]
-                       [FiniteDimensional ℝ E₂]
-                       (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set E₁),
-                     P s → P (φ '' s))
-    -- (2) P holds for all full-dimensional convex sets
-    (h_full_dim : ∀ {E : Type*}
-                    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-                    [FiniteDimensional ℝ E] (s : Set E),
-                  Convex ℝ s →
-                  affineDim ℝ s = Module.finrank ℝ E →
-                  P s)
-    -- Then P holds for all convex sets
-    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-    [FiniteDimensional ℝ E]
-    (C : Set E)
-    (hC : Convex ℝ C) :
-    P C := by
-  /-
-  Proof strategy:
-
-  Case 1: C is already full-dimensional
-    Apply h_full_dim directly
-
-  Case 2: C has dimension m < n (where n = dim E)
-    Step 1: Construct affine equivalence T : E → E such that
-            T(aff C) = coordinate subspace L ≅ Rᵐ
-            (This exists by Mathlib's AffineSubspace theory)
-
-    Step 2: Consider T(C) ⊆ L
-            Show T(C) is full-dimensional in L
-
-    Step 3: Regard L as a copy of Rᵐ
-            Apply h_full_dim to T(C) in this space
-
-    Step 4: Transfer result back to C using T⁻¹ and h_affine_equiv
-
-  The key technical work is in Step 1 (finding T) and Step 3 (the
-  type-theoretic gymnastics of working in the subspace L).
-  -/
-  sorry
-
-/-- **Specialized version for intrinsic properties**
-
-Many properties of convex sets depend only on their intrinsic structure
-(relative interior, relative closure, affine dimension) rather than the
-embedding. For such properties, we can state a cleaner version using ↔. -/
-theorem convex_property_by_reduction_to_full_dim_intrinsic
-    {P : ∀ {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-          [FiniteDimensional ℝ E], Set E → Prop}
-    -- P depends only on intrinsic structure (preserved by affine equivalence)
-    (h_intrinsic : ∀ {E₁ E₂ : Type*}
-                     [NormedAddCommGroup E₁] [InnerProductSpace ℝ E₁]
-                     [FiniteDimensional ℝ E₁]
-                     [NormedAddCommGroup E₂] [InnerProductSpace ℝ E₂]
-                     [FiniteDimensional ℝ E₂]
-                     (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set E₁),
-                   P s ↔ P (φ '' s))
-    -- P holds for full-dimensional convex sets
-    (h_full_dim : ∀ {E : Type*}
-                    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-                    [FiniteDimensional ℝ E] (s : Set E),
-                  Convex ℝ s →
-                  affineDim ℝ s = Module.finrank ℝ E →
-                  P s)
-    -- Then P holds for all convex sets
-    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-    [FiniteDimensional ℝ E]
-    (C : Set E)
-    (hC : Convex ℝ C) :
-    P C := by
-  apply convex_property_by_reduction_to_full_dim
-  · intro E₁ E₂ _ _ _ _ _ _ φ s hs
-    exact (h_intrinsic φ s).mp hs
-  · exact h_full_dim
 
 /-!
 #### Helper: Full-dimensional sets have simpler topology
