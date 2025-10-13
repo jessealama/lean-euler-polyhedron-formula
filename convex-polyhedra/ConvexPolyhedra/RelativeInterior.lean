@@ -200,15 +200,10 @@ theorem AffineEquiv.image_intrinsicClosure (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set
   sorry
 
 /-!
-#### The Reduction Theorem
+#### Rockafellar's Reduction to Full-Dimensional Case
 
-This is the main theorem that formalizes Rockafellar's methodological observation.
--/
-
-/-- **Rockafellar's Reduction to Full-Dimensional Case**
-
-This theorem formalizes Rockafellar's observation: **To prove a property P of convex sets,
-it suffices to:**
+The general reduction theorem formalizes Rockafellar's observation: **To prove a property P
+of convex sets, it suffices to:**
 1. Show P is preserved under affine equivalences
 2. Prove P for all full-dimensional convex sets
 
@@ -222,103 +217,24 @@ it suffices to:**
 **Key insight:** In the full-dimensional case, relative interior = ordinary interior,
 which often makes proofs much simpler.
 
-**Usage pattern:**
-```lean
-theorem my_property (C : Set E) (hC : Convex ℝ C) : P C := by
-  apply convex_property_by_reduction_to_full_dim
-  · -- Show P is preserved under affine equivalences
-    intro E₁ E₂ _ _ _ _ _ _ φ s hs
-    sorry
-  · -- Prove P for full-dimensional case
-    intro E _ _ _ s hs h_full
-    -- Here: intrinsicInterior s = interior s (much simpler!)
-    sorry
-```
-
 **References**:
 - Rockafellar, "Convex Analysis" (1970), Section 6, pages 44-45
 
-NOTE: The original formulation with implicit type parameters has Lean 4 elaboration issues.
-The refined version below uses explicit parameters and universe level 0 to avoid these issues.
+**NOTE:** The general reduction theorem `convex_property_by_reduction_to_full_dim` cannot
+be formulated in Lean 4 due to universe polymorphism limitations with dependent predicates.
+When using `Type*` in different quantifiers, Lean assigns different universe variables,
+causing universe unification failures. This is a fundamental limitation of Lean 4's type
+system with predicates that quantify over types with typeclasses.
 
-**Key changes from the original attempt**:
-- Use `Type*` (universe level 0) for all types - simpler than explicit universe parameters
-- Predicate `P` takes `Type*` parameters
-- Pass `E` explicitly to predicate `P`: `P E s` instead of just `P s`
-- All affine equivalences stay within `Type*`
-- Makes typeclass resolution straightforward
+**Workaround**: Use the helper theorems below directly in proofs instead of trying
+to apply a general schema. For detailed explanation and examples, see:
+- PROOF_SCHEMAS_IN_MATHLIB.md
+- ROCKAFELLAR_REDUCTION_THEOREM.lean (reference file, does not compile)
 
-**Usage pattern**:
-```lean
-theorem my_property (C : Set E) (hC : Convex ℝ C) : my_property_P E C := by
-  apply convex_property_by_reduction_to_full_dim
-  · -- Show property is preserved under affine equivalences
-    intro E₁ _ _ _ E₂ _ _ _ φ s h_P_s
-    -- Prove: P E₂ (φ '' s) from P E₁ s
-    sorry
-  · -- Prove for full-dimensional case
-    intro E _ _ _ s hs h_full
-    -- Here: intrinsicInterior s = interior s (simpler!)
-    -- Prove: P E s
-    sorry
-  · exact hC
-```
+The helper theorems `intrinsicInterior_eq_interior_of_full_dim` and
+`intrinsicClosure_eq_closure_of_full_dim` capture the key simplification that makes
+Rockafellar's technique work: in full-dimensional sets, relative topology = ambient topology.
 -/
-
-/-- **Rockafellar's Reduction to Full-Dimensional Case (Refined)**
-
-This is the working formulation using explicit parameters to avoid Lean 4 elaboration issues.
-
-To prove a property P holds for all convex sets, it suffices to:
-1. Show P is preserved under affine equivalences
-2. Prove P for all full-dimensional convex sets
--/
-theorem convex_property_by_reduction_to_full_dim
-    (P : ∀ (E : Type*) [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-          [FiniteDimensional ℝ E], Set E → Prop)
-    -- (1) P is preserved under affine equivalences
-    (h_affine_equiv : ∀ (E₁ E₂ : Type*)
-                       [NormedAddCommGroup E₁] [InnerProductSpace ℝ E₁]
-                       [FiniteDimensional ℝ E₁]
-                       [NormedAddCommGroup E₂] [InnerProductSpace ℝ E₂]
-                       [FiniteDimensional ℝ E₂]
-                       (φ : E₁ ≃ᵃ[ℝ] E₂) (s : Set E₁),
-                     P E₁ s → P E₂ (φ '' s))
-    -- (2) P holds for all full-dimensional convex sets
-    (h_full_dim : ∀ (E : Type*) [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-                    [FiniteDimensional ℝ E] (s : Set E),
-                  Convex ℝ s →
-                  affineDim ℝ s = Module.finrank ℝ E →
-                  P E s)
-    -- Then P holds for all convex sets
-    (E : Type*) [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-    [FiniteDimensional ℝ E]
-    (C : Set E)
-    (hC : Convex ℝ C) :
-    P E C := by
-  /-
-  Proof strategy:
-
-  Case 1: C is already full-dimensional
-    Apply h_full_dim directly
-
-  Case 2: C has dimension m < n (where n = dim E)
-    Step 1: Construct affine equivalence T : E → E such that
-            T(aff C) = coordinate subspace L ≅ ℝᵐ
-            (This exists by Mathlib's AffineSubspace theory)
-
-    Step 2: Consider T(C) ⊆ L
-            Show T(C) is full-dimensional in L
-
-    Step 3: Regard L as a copy of ℝᵐ
-            Apply h_full_dim to T(C) in this space
-
-    Step 4: Transfer result back to C using T⁻¹ and h_affine_equiv
-
-  The key technical work is in Step 1 (finding T) and Step 3 (the
-  type-theoretic gymnastics of working in the subspace L).
-  -/
-  sorry
 
 /-!
 #### Helper: Full-dimensional sets have simpler topology
