@@ -687,10 +687,25 @@ theorem Convex.combo_intrinsicInterior_intrinsicClosure_mem_intrinsicInterior
   constructor
   · -- Show: ⟨z, hz_span⟩ ∈ interior (Subtype.val ⁻¹' s)
 
-    -- The proof strategy: Work in the direction space where we have AddCommGroup,
-    -- then transfer back. This is the WLOG reduction Rockafellar mentions.
+    /-
+    **Rockafellar's Reduction:**
 
-    sorry
+    Following Rockafellar (page 45): "In view of the preceding remark, we can limit
+    attention to the case where C is n-dimensional, so that ri C = int C."
+
+    The key insight: In the affine span (affineSpan ℝ s), the set s has full dimension.
+    This means we can use ordinary convex analysis theorems in the subspace topology.
+
+    However, affineSpan ℝ s is an affine space (not a vector space), so we need
+    to apply the theorem in a slightly indirect way.
+    -/
+
+    sorry  -- TODO: Apply Convex.combo_interior_closure_mem_interior
+           -- This requires working around the fact that affineSpan ℝ s doesn't
+           -- have AddCommMonoid structure. We may need to either:
+           -- (a) Use the translation homeomorphism to work in the direction space
+           -- (b) Find a version of combo_interior_closure_mem_interior for affine spaces
+           -- (c) Prove it directly using openness/closure properties
 
   · -- STEP 2: Transfer back
     -- Show: the coe map gives us back our combination in E
