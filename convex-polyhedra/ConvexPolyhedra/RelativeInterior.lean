@@ -718,11 +718,16 @@ Formally: z ∈ ri C ⟺ (∀ x ∈ C, ∃ μ > 1, (1 - μ)x + μz ∈ C)
 theorem mem_intrinsicInterior_iff_extension
     {s : Set E} (hs : Convex ℝ s) (hs_ne : s.Nonempty) {z : E} :
     z ∈ intrinsicInterior ℝ s ↔
-    ∀ x ∈ s, ∃ μ > 1, (1 - μ) • x + μ • z ∈ s := by
+    ∀ x ∈ s, ∃ (μ : ℝ), μ > 1 ∧ (1 - μ) • x + μ • z ∈ s := by
   constructor
 
   · -- (⇒) Forward direction: z ∈ ri s → extension property
     intro hz x hx
+
+    rw [mem_intrinsicInterior] at hz
+    obtain ⟨⟨z_pt, hz_span⟩, hz_interior, rfl⟩ := hz
+    haveI : Nonempty (affineSpan ℝ s) := ⟨⟨z_pt, hz_span⟩⟩
+    
 
     -- We have z ∈ intrinsicInterior s and x ∈ s
     -- Need to show: ∃ μ > 1 such that (1 - μ) • x + μ • z ∈ s
@@ -764,24 +769,44 @@ theorem mem_intrinsicInterior_iff_extension
     -- We have x ∈ intrinsicInterior s
     -- By hypothesis h_ext with this x, since x ∈ intrinsicInterior s ⊆ s:
     have hx_in_s : x ∈ s := intrinsicInterior_subset hx
-    obtain ⟨μ, hμ_gt_1, hy⟩ := h_ext x hx_in_s
+    obtain ⟨μ, ⟨hμ_gt_1, hy⟩⟩ := h_ext x hx_in_s
 
     -- hy states: (1 - μ) • x + μ • z ∈ s
     -- We need to express z as a convex combination of x and this point
 
-    -- Since the algebra is getting complex with type inference,
-    -- let's use a more direct approach
-
-    -- From (1 - μ)•x + μ•z ∈ s and μ > 1, we can rearrange to get
-    -- z = (1 - 1/μ)•x + (1/μ)•((1 - μ)•x + μ•z)
+    have h_z : z = (1 - 1/μ)•x + (1/μ)•((1 - μ)•x + μ•z) := by
+      have hμ_ne : μ ≠ 0 := by linarith
+      have h1 : (1 : ℝ) / μ * μ = 1 := by field_simp
+      calc z
+          = (0 : ℝ)•x + z := by rw [zero_smul, zero_add]
+        _ = ((1 : ℝ) - 1/μ + (1 - μ)/μ)•x + z := by
+            rw [show (0 : ℝ) = (1 : ℝ) - 1/μ + (1 - μ)/μ by field_simp; ring]
+        _ = ((1 : ℝ) - 1/μ)•x + ((1 - μ)/μ)•x + z := by rw [add_smul, add_assoc]
+        _ = ((1 : ℝ) - 1/μ)•x + (((1 : ℝ)/μ) * (1 - μ))•x + ((1 : ℝ)/μ * μ)•z := by
+            rw [show (1 - μ) / μ = ((1 : ℝ) / μ) * (1 - μ) by field_simp]; rw [h1, one_smul]
+        _ = ((1 : ℝ) - 1/μ)•x + ((1/μ)•(1 - μ)•x + (1/μ)•μ•z) := by rw [mul_smul, mul_smul]; ac_rfl
+        _ = ((1 : ℝ) - 1/μ)•x + (1/μ)•((1 - μ)•x + μ•z) := by rw [← smul_add]
 
     -- The key insight: We need to show z ∈ intrinsicInterior s
     -- by expressing it as a convex combination of x ∈ intrinsicInterior s
     -- and a point in s (hence in intrinsicClosure s)
+    have h_comb : (1 - 1/μ) + (1/μ) = (1 : ℝ) := by
+      field_simp; linarith
+    have hμ_pos : (0 : ℝ) < μ := by linarith
+    have h_nonneg_1m1mu : (0 : ℝ) ≤ (1 : ℝ) - 1/μ := by
+      field_simp; linarith
+    have h_nonneg_1mu : (0 : ℝ) ≤ 1/μ := by
+      exact one_div_nonneg.mpr (le_of_lt hμ_pos)
+    have h_lt_1mu : 1/μ < (1 : ℝ) := by
+      field_simp; linarith
+    -- Now apply Theorem 6.1: since x ∈ intrinsicInterior s and
+    -- ((1 - μ)•x + μ•z) ∈ s, we have z ∈ intrinsicInterior s
+    have hy_in_closure : (1 - μ) • x + μ • z ∈ intrinsicClosure ℝ s :=
+      (subset_intrinsicClosure : s ⊆ intrinsicClosure ℝ s) hy
+    rw [h_z]
+    exact Convex.combo_intrinsicInterior_intrinsicClosure_mem_intrinsicInterior (t := 1/μ)
+      hs hx hy_in_closure h_nonneg_1mu h_lt_1mu
 
-    -- This requires careful algebraic manipulation that depends on
-    -- proper handling of the scalar μ as a real number
-    sorry
 
 /-!
 ### Applications and corollaries
