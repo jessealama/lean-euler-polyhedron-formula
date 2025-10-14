@@ -685,48 +685,10 @@ theorem Convex.combo_intrinsicInterior_intrinsicClosure_mem_intrinsicInterior
   use ⟨z, hz_span⟩
 
   constructor
-  · -- (a) and (c): Show ⟨z, hz_span⟩ ∈ interior ((↑) ⁻¹' s)
-    /-
-    AFFINE EQUIVALENCE APPROACH (Proof Sketch):
+  · -- Show: ⟨z, hz_span⟩ ∈ interior (Subtype.val ⁻¹' s)
 
-    The key idea: Transfer the affine space to its direction (a vector space) via a base point.
-
-    Step 1: Choose a base point
-      - Pick p₀ := ⟨x_pt, hx_span⟩ ∈ affineSpan ℝ s (we know this is nonempty)
-      - The direction V := (affineSpan ℝ s).direction is a vector subspace
-
-    Step 2: Create the affine-to-vector equivalence
-      - Define φ : affineSpan ℝ s → V by φ(p) = p -ᵥ p₀
-      - This is bijective with inverse φ⁻¹(v) = p₀ +ᵥ v
-      - Key property: φ preserves convex combinations (affine maps do)
-
-    Step 3: Transfer the problem to the vector space V
-      - The set s translates to: s' := {p -ᵥ p₀ | p ∈ s ∩ affineSpan ℝ s}
-      - Under φ:
-          * x_pt maps to 0 (since x_pt = p₀)
-          * y_pt maps to v_y := y_pt -ᵥ p₀
-          * z maps to v_z := z -ᵥ p₀ = (1-t)•0 + t•v_y = t•v_y
-      - The convex combination becomes: v_z = (1-t)•0 + t•v_y (vector space operation!)
-
-    Step 4: Apply Convex.combo_interior_closure_mem_interior in V
-      - V is an AddCommGroup (it's a vector subspace)
-      - s' is convex in V (convexity is preserved by affine maps)
-      - 0 ∈ interior s' (because x_pt ∈ interior ((↑) ⁻¹' s))
-      - v_y ∈ closure s' (because y_pt ∈ closure ((↑) ⁻¹' s))
-      - Therefore: v_z = (1-t)•0 + t•v_y ∈ interior s'
-
-    Step 5: Transfer back to affineSpan ℝ s
-      - Apply φ⁻¹: since v_z ∈ interior s', we get z = p₀ +ᵥ v_z ∈ interior ((↑) ⁻¹' s)
-      - This uses the fact that φ⁻¹ is a homeomorphism (preserves interior)
-
-    KEY LEMMAS NEEDED:
-      1. Affine maps preserve convexity
-      2. Homeomorphisms preserve interior and closure
-      3. Translation (p ↦ p -ᵥ p₀) is a homeomorphism
-      4. The direction (affineSpan ℝ s).direction has AddCommGroup structure
-
-    These are all standard in Mathlib, but we need to assemble them carefully.
-    -/
+    -- The proof strategy: Work in the direction space where we have AddCommGroup,
+    -- then transfer back. This is the WLOG reduction Rockafellar mentions.
 
     sorry
 
