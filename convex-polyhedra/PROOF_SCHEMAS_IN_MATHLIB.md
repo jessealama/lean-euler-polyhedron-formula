@@ -50,7 +50,7 @@ c) **Higher-order lemmas** taking predicates as arguments
 - **Equivalence preservation**: `Mathlib.Analysis.Convex.Topology`
   - `convexHull_closure`, `convexHull_inter` use dimension-based reduction
 
-- **Affine invariance**: `Mathlib.Analysis.Convex.Independent`
+- **Affine invariance**: ` `
   - `AffineIsometryEquiv.image_convexHull` preserves properties under affine maps
 
 ### 2. Handling Polymorphic Predicates
