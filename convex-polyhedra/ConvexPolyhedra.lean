@@ -4,7 +4,7 @@
 -- Core definitions
 import ConvexPolyhedra.Basic              -- H-representation (half-spaces)
 import ConvexPolyhedra.VRepresentation    -- V-representation (convex hull) - PRIMARY
-import ConvexPolyhedra.MinkowskiWeyl      -- H ↔ V equivalence
+-- import ConvexPolyhedra.MinkowskiWeyl   -- H ↔ V equivalence (not needed currently)
 
 -- Face lattice and homological machinery
 import ConvexPolyhedra.Face
