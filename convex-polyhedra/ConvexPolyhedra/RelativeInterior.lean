@@ -560,157 +560,34 @@ interior and closure are preserved.
 **Usage**: For `f : X ≃ₜ Y`, use `f.image_interior A` and `f.image_closure A`.
 -/
 
-/-- AddTorsor structures form a subsingleton.
-
-For any additive group `G` and type `P`, there is at most one way to make `P` into
-an `AddTorsor` over `G`. This is because the torsor operations (`+ᵥ` and `-ᵥ`) are
-determined by their algebraic properties, which force uniqueness.
-
-**Mathematical intuition**: An affine space structure is uniquely determined by its
-translation and difference operations, which must satisfy the torsor axioms. These
-axioms are strong enough to force uniqueness of the structure.
-
-**Proof strategy**: After decomposing both torsor structures with `cases` and using
-`congr` to split into field-wise equality, we get two main goals:
-1. Prove `AddAction` instances are equal (via the `toAddAction` field)
-2. Prove `VSub` instances are equal (via the `toVSub` field)
-
-The remaining proof obligations are marked with `sorry`. These should follow from:
-- The torsor axioms `vsub_vadd'` and `vadd_vsub'` force mutual determination
-- For any g : G and p : P, the value g +ᵥ p is uniquely determined as the point q such that q -ᵥ p = g
-- Conversely, p₁ -ᵥ p₂ is uniquely determined as the g such that g +ᵥ p₂ = p₁
-
-**Note**: This should be an instance in Mathlib but currently isn't. The uniqueness
-proofs for `AddAction` and `VSub` in the context of torsors are foundational results
-that would strengthen Mathlib's torsor theory. -/
-instance (G : Type*) [AddGroup G] (P : Type*) : Subsingleton (AddTorsor G P) := by
-  -- Use Subsingleton.intro: show any two AddTorsor instances are equal
-  refine Subsingleton.intro fun t₁ t₂ => ?_
-
-  -- The key insight: the torsor operations are uniquely determined by the axioms
-  -- Given any base point p₀ : P (which exists since AddTorsor requires Nonempty P),
-  -- the vadd and vsub operations are mutually determining:
-  --   * vadd_vsub' says: (g +ᵥ p) -ᵥ p = g  (so vsub determines vadd)
-  --   * vsub_vadd' says: (p₁ -ᵥ p₂) +ᵥ p₂ = p₁  (so vadd determines vsub)
-
-  -- Mathematical key: The torsor operations are uniquely determined.
-  -- Given any base point p₀ ∈ P, the map φ : G → P defined by φ(g) = g +ᵥ p₀
-  -- is a bijection, and the torsor structure is completely determined by this bijection.
-  --
-  -- Since both t₁ and t₂ give torsor structures on P, they must define the same
-  -- bijections and hence the same operations.
-
-  -- Pick a base point (guaranteed by nonemptiness)
-  haveI inst1 : AddTorsor G P := t₁
-  obtain ⟨p₀⟩ := @AddTorsor.nonempty G P _ inst1
-
-  -- Key observation: Both instances define bijections G ≃ P via g ↦ g +ᵥ p₀
-  -- Since the torsor axioms determine the operations uniquely, these must be the same bijection
-
-  -- For vadd: Given p and g, we have g +ᵥ p = (g + (p -ᵥ p₀)) +ᵥ p₀
-  -- This shows vadd is determined by a choice of base point and the group structure
-
-  -- For vsub: Given p₁ and p₂, p₁ -ᵥ p₂ is the unique g such that g +ᵥ p₂ = p₁
-  -- By the bijection property (vadd_right_injective), this is uniquely determined
-
-  -- Strategy: Show both instances give the same vadd and vsub operations by function extensionality
-  -- Try decomposing the structures
-  cases t₁
-  cases t₂
-
-  -- After cases, we need to show structural equality
-  -- Use congr to break into field equality
-  congr 1
-
-  -- Now we have two goals: toAddAction equality and toVSub equality
-  -- First goal: toAddAction✝¹ = toAddAction✝
-  case e_toAddAction =>
-    ext g p
-    -- Goal: (g +ᵥ p) under t₁ equals (g +ᵥ p) under t₂
-    -- Use the torsor axioms to express both sides in terms of p₀
-    -- Both sides equal (g + (p -ᵥ p₀)) +ᵥ p₀
-    -- So they are equal
-    -- This uses the fact that vadd is determined by vsub and vice versa
-    -- The detailed proof would involve unfolding the definitions and applying the axioms
-    sorry
-
-  -- Second goal: toVSub✝¹ = toVSub✝
-  case e_toVSub =>
-    sorry
-
+omit [FiniteDimensional ℝ E] in
 /-- **Lemma 3**: Translation in an affine space is a homeomorphism.
 
 For any nonempty affine subspace A and base point p₀ ∈ A, the map φ : A → A.direction
 defined by φ(p) = p -ᵥ p₀ is a homeomorphism.
 
-This uses:
-  1. `Equiv.constVSub` - the map is bijective (from AddTorsor properties)
-  2. `continuous_vsub` - vsub is continuous
-  3. `Continuous.vadd` - vadd is continuous
+This uses `Homeomorph.vaddConst` from Mathlib, which provides the homeomorphism
+`v ↦ v +ᵥ p₀` from `A.direction` to `A`. The inverse of this homeomorphism is
+exactly `p ↦ p -ᵥ p₀`.
 
-**Key insight**: An affine subspace is an AddTorsor over its direction (via
-`AffineSubspace.toAddTorsor`), so we can use the standard AddTorsor translation
-equivalence and upgrade it to a homeomorphism.
-
-**Note**: We postulate `MetricSpace A` to help typeclass synthesis. In practice,
-affine subspaces of normed spaces inherit the subspace metric.
+**Key insight**: An affine subspace is an `IsTopologicalAddTorsor` (via
+`AffineSubspace.toAddTorsor`), so we can use `Homeomorph.vaddConst` directly.
 -/
 theorem affineSubspace_translation_homeomorph (A : AffineSubspace ℝ E)
-    [Nonempty A] [MetricSpace A]
+    [Nonempty A]
     (p₀ : A) :
     ∃ (f : A ≃ₜ A.direction), ∀ p : A, f p = (p : E) -ᵥ (p₀ : E) := by
-  /-
-  Strategy: constVSub p₀ gives p ↦ p₀ -ᵥ p, but we want p ↦ p -ᵥ p₀.
-  These differ by a sign: p -ᵥ p₀ = -(p₀ -ᵥ p).
-
-  Approach: Compose constVSub with negation in the vector space A.direction.
-  -/
-
-  -- We need NormedAddTorsor instance for A
-  haveI : NormedAddTorsor A.direction A := inferInstance
-
-  -- Build the homeomorphism: negate ∘ constVSub
-  -- constVSub gives p ↦ p₀ -ᵥ p
-  -- negation gives v ↦ -v
-  -- composition gives p ↦ -(p₀ -ᵥ p) = p -ᵥ p₀
-
-  let ψ := AffineIsometryEquiv.constVSub ℝ p₀
-  let neg := LinearIsometryEquiv.neg ℝ (E := A.direction)
-  let φ := ψ.toHomeomorph.trans neg.toHomeomorph
-
-  use φ
+  -- Use Homeomorph.vaddConst which gives v ↦ v +ᵥ p₀ : A.direction → A
+  -- Its inverse gives p ↦ p -ᵥ p₀ : A → A.direction, which is what we want
+  use (Homeomorph.vaddConst p₀).symm
 
   intro p
-  -- Goal: ↑(φ p) = ↑p -ᵥ ↑p₀ where φ p lives in A.direction
-  -- φ = ψ.toHomeomorph.trans neg.toHomeomorph, so φ p = neg (ψ p)
-
-  -- Unfold all the definitions step by step
-  grw [Homeomorph.trans_apply, AffineIsometryEquiv.coe_toHomeomorph,
-       LinearIsometryEquiv.coe_toHomeomorph]
-
-  -- Now goal should involve constVSub and neg explicitly
-  grw [AffineIsometryEquiv.coe_constVSub, LinearIsometryEquiv.coe_neg]
-
-  -- Goal: -↑((fun x ↦ p₀ -ᵥ x) p) = ↑p -ᵥ ↑p₀
-  -- Simplify the lambda application
-  simp only []
-
-  -- Goal should be: -↑(p₀ -ᵥ p) = ↑p -ᵥ ↑p₀
-  grw [Submodule.coe_neg]
-
-  -- Goal: -(↑(p₀ -ᵥ p)) = ↑p -ᵥ ↑p₀
-  -- The coercion commutes with vsub, and then apply neg_vsub_eq_vsub_rev
-  convert neg_vsub_eq_vsub_rev (↑p₀ : E) (↑p : E) using 2
-  -- Subgoal: ↑(p₀ -ᵥ p) = ↑p₀ -ᵥ ↑p (coercion commutes with vsub)
-  -- This should be true by definition of vsub in affine subspaces
-  -- The vsub operation in A gives an element of A.direction, and coercing it
-  -- to E should equal the vsub of the coerced elements in E
-  norm_cast
-  -- The goal is now p₀ -ᵥ p = p₀ -ᵥ p, but there's a typeclass diamond
-  -- Two different AddGroup instances are used, but they're propositionally equal
-  convert rfl
-  -- Use the subsingleton instance to show the two AddTorsor instances are equal
-  subsingleton
+  -- Goal: ↑((Homeomorph.vaddConst p₀).symm p) = ↑p -ᵥ ↑p₀
+  -- Use Homeomorph.vaddConst_symm_apply: (vaddConst p₀).symm p' = p' -ᵥ p₀
+  rw [Homeomorph.vaddConst_symm_apply]
+  -- Now goal is: ↑(p -ᵥ p₀) = ↑p -ᵥ ↑p₀
+  -- This is exactly AffineSubspace.coe_vsub (which is rfl)
+  rfl
 
 /-- **Instance 4**: The direction of an affine subspace has AddCommGroup structure.
 
