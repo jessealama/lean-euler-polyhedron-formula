@@ -305,106 +305,33 @@ theorem affineIndependent_indexed
       _ = (g i - g₀) + A f₀ + (g₀ - A f₀)   := by rw [h_basis_map]
       _ = g i                               := by abel
 
-/-- **Rockafellar's Theorem 1.6**: Affinely independent sets of the same size can be mapped to each
-other by an affine automorphism of the ambient space.
+/-- **Rockafellar's Theorem 1.6**: Affinely independent families of the same size can be
+mapped to each other by an affine automorphism of the ambient space.
 
-Given two affinely independent finite sets {b₀, b₁, ..., bₘ} and {b'₀, b'₁, ..., b'ₘ} in E,
-there exists a one-to-one affine transformation T : E → E such that T maps s bijectively to t.
+Given two affinely independent families f, g : ι → E with the same finite index type ι,
+there exists an affine automorphism T : E ≃ᵃ[ℝ] E such that T ∘ f = g
+(i.e., T (f i) = g i for all i).
 
-This is the finite-dimensional version of Rockafellar's Theorem 1.6 from "Convex Analysis".
+This is the most general form of Rockafellar's Theorem 1.6 from "Convex Analysis" (1970).
+Unlike `affineIndependent_indexed`, this theorem does NOT require the families to span
+the entire space - it works for any affinely independent families with the same cardinality.
 
-The proof proceeds by induction on n = (dim E + 1) - |s|:
-- Base case (n = 0): Both s and t have maximal dimension (dim E + 1 points), so they span
-  the entire space. We construct affine bases from them and build the automorphism.
-- Inductive step: When |s| < dim E + 1, we extend both s and t by adding one point each,
-  preserving affine independence. By IH, we get an automorphism T' mapping s' to t'.
-  Since s ⊆ s' (as cosets) and T' bijects s' to t', we have T' '' s = t.
+The key difference from `affineIndependent_indexed`:
+- `affineIndependent_indexed`: Requires both families span ⊤
+  (base case for full-dimensional families)
+- `affineIndependent_to_affineIndependent_automorphism`: Works for ANY affinely
+  independent families
+
+The proof proceeds by induction on the "dimension gap" n = (finrank E + 1) - card ι:
+- Base case (n = 0): Both families have card ι = finrank E + 1, so they span the
+  entire space. Apply `affineIndependent_indexed` directly.
+- Inductive step (n > 0): The families don't span the entire space. Find points outside
+  their affine spans, extend both families, apply the IH, and use the restriction property.
 -/
 theorem affineIndependent_to_affineIndependent_automorphism
-    [DecidableEq E]
-    (s t : Finset E)
-    (h_card_eq : s.card = t.card)
-    (hs : AffineIndependent ℝ ((↑) : s → E))
-    (ht : AffineIndependent ℝ ((↑) : t → E)) :
-    ∃ (T : E ≃ᵃ[ℝ] E), T '' s = t := by
-  -- Induction on the "dimension gap": how many points we need to add to reach a full basis
-  let n : ℕ := Module.finrank ℝ E + 1 - Finset.card s
-
-  -- Induction on n, generalizing over s and t
-  induction n generalizing s t with
-  | zero => sorry
-  | succ k ih =>
-    -- INDUCTIVE STEP: n = k + 1 > 0, so |s| < dim E + 1
-    -- We can extend s and t by adding one point each
-    -- Since n = k + 1, we have Module.finrank ℝ E + 1 - s.card = k + 1
-    have h_n_succ : Module.finrank ℝ E + 1 - s.card = k + 1 := by
-      show Module.finrank ℝ E + 1 - s.card = k + 1
-      sorry  -- This is true by the induction step
-    have h_card_lt : s.card < Module.finrank ℝ E + 1 := by
-      -- If a - b = k + 1 > 0, then b < a
-      -- We have Module.finrank ℝ E + 1 - s.card = k + 1
-      -- This means Module.finrank ℝ E + 1 = s.card + (k + 1)
-      have h_le : s.card ≤ Module.finrank ℝ E + 1 :=
-        affineIndependent_card_le_finrank_add_one s hs
-      -- From Module.finrank ℝ E + 1 - s.card = k + 1 > 0, we get s.card < Module.finrank ℝ E + 1
-      omega
-
-    -- Since |s| < dim E + 1, the affine span of s is not the whole space
-    have h_span_ne_top : affineSpan ℝ (s : Set E) ≠ ⊤ := by
-      sorry
-
-    -- So there exists a point p ∉ affineSpan ℝ s
-    have : ∃ p : E, p ∉ affineSpan ℝ (s : Set E) := by
-      sorry
-    obtain ⟨p, hp⟩ := this
-
-    -- Similarly for t
-    have : ∃ q : E, q ∉ affineSpan ℝ (t : Set E) := by
-      sorry
-    obtain ⟨q, hq⟩ := this
-
-    -- Extend s and t
-    have hp_notin_s : p ∉ s := by
-      sorry
-    have hq_notin_t : q ∉ t := by
-      sorry
-
-    let s' : Finset E := insert p s
-    let t' : Finset E := insert q t
-
-    -- The extended sets are still affinely independent
-    have hs' : AffineIndependent ℝ ((↑) : s' → E) := by
-      sorry
-
-    have ht' : AffineIndependent ℝ ((↑) : t' → E) := by
-      sorry
-
-    -- The extended sets have the same cardinality
-    have h_card_eq' : s'.card = t'.card := by
-      simp [s', t']
-      rw [Finset.card_insert_of_notMem hp_notin_s]
-      rw [Finset.card_insert_of_notMem hq_notin_t]
-      linarith
-
-    -- The dimension gap is exactly k
-    have h_n_eq_k : Module.finrank ℝ E + 1 - s'.card = k := by
-      simp [s']
-      rw [Finset.card_insert_of_notMem hp_notin_s]
-      -- We have Module.finrank ℝ E + 1 - s.card = k + 1
-      -- and s'.card = s.card + 1
-      -- so Module.finrank ℝ E + 1 - (s.card + 1) = k
-      calc Module.finrank ℝ E + 1 - (s.card + 1)
-          = (Module.finrank ℝ E + 1 - s.card) - 1 := by
-            -- Nat subtraction: (a - b) - 1 = a - (b + 1)
-            exact Nat.sub_sub (Module.finrank ℝ E + 1) s.card 1
-        _ = (k + 1) - 1 := by rw [h_n_succ]
-        _ = k := by omega
-
-    -- Apply induction hypothesis
-    obtain ⟨T, hT⟩ := ih s' t' h_card_eq' hs' ht'
-
-    -- T maps s' to t', and since s ⊆ s' and t ⊆ t',
-    -- we need to show T '' s = t
-    use T
-
-    sorry
+    {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (f g : ι → E)
+    (hf : AffineIndependent ℝ f)
+    (hg : AffineIndependent ℝ g) :
+    ∃ (T : E ≃ᵃ[ℝ] E), ∀ i, T (f i) = g i := by
+  sorry
