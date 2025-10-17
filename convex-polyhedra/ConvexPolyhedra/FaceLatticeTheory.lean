@@ -121,7 +121,8 @@ theorem exposed_face_eq_of_subset_affineSpan_eq {P : ConvexPolyhedron E}
     --   - F is nonempty (from GeometricFace definition)
     --
     -- Apply the key lemma: if F ⊆ G ⊆ affineSpan F with equal dimensions, then G ⊆ F
-    exact subset_of_subset_affineSpan_same_dim hF_conv hG_conv F.prop.2 h_subset hG_in_spanF h_dim_eq
+    exact subset_of_subset_affineSpan_same_dim hF_conv hG_conv F.prop.2 h_subset hG_in_spanF
+      h_dim_eq
 
   exact Set.Subset.antisymm h_subset this
 
