@@ -159,40 +159,84 @@ theorem affineIndependent_indexed
   let f₀ := f i₀
   let g₀ := g i₀
 
-  -- Step 1: Show that {f i - f₀ | i ≠ i₀} is linearly independent
+  -- Define the difference families (cleaner than repeating the bulky lambda)
+  let f_diff : {i // i ≠ i₀} → E := fun i => f i - f₀
+  let g_diff : {i // i ≠ i₀} → E := fun i => g i - g₀
+
+  -- Step 1: Show that f_diff is linearly independent
   -- This follows from affine independence of f via affineIndependent_iff_linearIndependent_vsub
-  have h_linear_indep_f : LinearIndependent ℝ (fun i : {i // i ≠ i₀} => f i - f₀) := by
+  have h_linear_indep_f : LinearIndependent ℝ f_diff := by
     have h := (affineIndependent_iff_linearIndependent_vsub ℝ f i₀).mp hf
     convert h using 2
 
-  -- Step 2: Show that {f i - f₀ | i ≠ i₀} spans E
-  -- This follows from f spanning the affine space (affineSpan = ⊤)
-  have h_span_f : ⊤ ≤ Submodule.span ℝ (range (fun i : {i // i ≠ i₀} => f i - f₀)) := by
-    sorry
+  -- Step 2: Show that f_diff spans E
+  -- Strategy: A linearly independent family with cardinality = finrank spans the space
+  have h_span_f : ⊤ ≤ Submodule.span ℝ (range f_diff) := by
+    -- First, show that Fintype.card {i // i ≠ i₀} = Module.finrank ℝ E
+    -- Since affineSpan f = ⊤ and f is affinely independent,
+    -- by AffineIndependent.affineSpan_eq_top_iff_card_eq_finrank_add_one,
+    -- we have Fintype.card ι = Module.finrank ℝ E + 1
+    have h_card_ι : Fintype.card ι = Module.finrank ℝ E + 1 :=
+      hf.affineSpan_eq_top_iff_card_eq_finrank_add_one.mp hf_span
+
+    -- The cardinality of {i // i ≠ i₀} is one less than the cardinality of ι
+    have h_card : Fintype.card {i // i ≠ i₀} = Module.finrank ℝ E := by
+      -- Fintype.card {i // i ≠ i₀} = Fintype.card ι - 1
+      -- Use Set.card_ne_eq from Mathlib.Data.Set.Finite.Basic
+      have h_sub : Fintype.card {i // i ≠ i₀} = Fintype.card ι - 1 :=
+        Set.card_ne_eq i₀
+      rw [h_sub, h_card_ι]
+      omega
+
+    -- By linearIndependent_iff_card_eq_finrank_span:
+    -- LinearIndependent implies card = finrank(span)
+    have h_finrank_span : Fintype.card {i // i ≠ i₀} = (range f_diff).finrank ℝ :=
+      (linearIndependent_iff_card_eq_finrank_span.mp h_linear_indep_f)
+
+    -- Since card = Module.finrank E and card = finrank(span),
+    -- we have finrank(span) = Module.finrank E
+    have h_span_full : (range f_diff).finrank ℝ = Module.finrank ℝ E :=
+      h_finrank_span.symm.trans h_card
+
+    -- A submodule with finrank equal to the ambient space must be the whole space
+    -- Use Submodule.eq_top_of_finrank_eq from Mathlib/LinearAlgebra/FiniteDimensional/Basic.lean
+    have h_span_eq_top : Submodule.span ℝ (range f_diff) = ⊤ :=
+      Submodule.eq_top_of_finrank_eq h_span_full
+
+    exact h_span_eq_top.ge
 
   -- Construct linear basis B_f
   let B_f : Module.Basis {i // i ≠ i₀} ℝ E := Module.Basis.mk h_linear_indep_f h_span_f
 
   -- Similarly for g: linear independence follows from affine independence
-  have h_linear_indep_g : LinearIndependent ℝ (fun i : {i // i ≠ i₀} => g i - g₀) := by
+  have h_linear_indep_g : LinearIndependent ℝ g_diff := by
     have h := (affineIndependent_iff_linearIndependent_vsub ℝ g i₀).mp hg
     convert h using 2
 
-  have h_span_g : ⊤ ≤ Submodule.span ℝ (range (fun i : {i // i ≠ i₀} => g i - g₀)) := by
-    sorry
+  -- And g_diff also spans E (by the same cardinality argument)
+  have h_span_g : ⊤ ≤ Submodule.span ℝ (range g_diff) := by
+    -- Same cardinality argument as for f
+    have h_card_ι : Fintype.card ι = Module.finrank ℝ E + 1 :=
+      hg.affineSpan_eq_top_iff_card_eq_finrank_add_one.mp hg_span
+    have h_card : Fintype.card {i // i ≠ i₀} = Module.finrank ℝ E := by
+      have h_sub : Fintype.card {i // i ≠ i₀} = Fintype.card ι - 1 :=
+        Set.card_ne_eq i₀
+      rw [h_sub, h_card_ι]
+      omega
+    have h_finrank_span : Fintype.card {i // i ≠ i₀} = (range g_diff).finrank ℝ :=
+      (linearIndependent_iff_card_eq_finrank_span.mp h_linear_indep_g)
+    have h_span_full : (range g_diff).finrank ℝ = Module.finrank ℝ E :=
+      h_finrank_span.symm.trans h_card
+    have h_span_eq_top : Submodule.span ℝ (range g_diff) = ⊤ :=
+      Submodule.eq_top_of_finrank_eq h_span_full
+    exact h_span_eq_top.ge
 
   let B_g : Module.Basis {i // i ≠ i₀} ℝ E := Module.Basis.mk h_linear_indep_g h_span_g
 
   -- Step 3: Construct linear automorphism A mapping B_f to B_g
-  -- Use Basis.constr to define A : E →ₗ[ℝ] E by A(f i - f₀) = g i - g₀
-  let A_map : E →ₗ[ℝ] E := B_f.constr ℝ (fun i => g i - g₀)
-
-  -- Show A is bijective (it's a linear map between bases of same dimension)
-  have h_bijective_A : Function.Bijective A_map := by
-    sorry
-
-  -- Package as LinearEquiv
-  let A : E ≃ₗ[ℝ] E := LinearEquiv.ofBijective A_map h_bijective_A
+  -- Use Basis.equiv to construct a linear equivalence that maps B_f i to B_g i
+  -- This is automatically bijective since it's a LinearEquiv
+  let A : E ≃ₗ[ℝ] E := B_f.equiv B_g (Equiv.refl _)
 
   -- Step 4: Define affine automorphism T x := A x + (g₀ - A f₀)
   let T : E ≃ᵃ[ℝ] E := {
@@ -201,16 +245,24 @@ theorem affineIndependent_indexed
     left_inv := by
       intro x
       -- Need to show: A.symm (A x + (g₀ - A f₀) - (g₀ - A f₀)) = x
-      sorry
+      simp only [add_sub_cancel_right]
+      exact A.left_inv x
     right_inv := by
       intro x
       -- Need to show: A (A.symm (x - (g₀ - A f₀))) + (g₀ - A f₀) = x
-      sorry
+      simp only [LinearEquiv.apply_symm_apply]
+      exact sub_add_cancel x (g₀ - A f₀)
     linear := A
     map_vadd' := by
       intro x v
-      -- Need to show: T (x + v) = T x + v
-      sorry
+      -- For an affine map, we need: toFun (p +ᵥ v) = toFun p +ᵥ linear v
+      -- The affine structure requires: (A (x + v) + (g₀ - A f₀)) = (A x + (g₀ - A f₀)) + A v
+      simp only [vadd_eq_add]
+      -- Unfold the toFun application and expand using linearity of A
+      change A (v + x) + (g₀ - A f₀) = A v + (A x + (g₀ - A f₀))
+      rw [A.map_add]
+      -- This is just associativity of addition
+      ac_rfl
   }
 
   use T
@@ -221,12 +273,37 @@ theorem affineIndependent_indexed
   · -- Case i = i₀: T(f₀) = g₀
     subst h
     -- Need to show: A f₀ + (g₀ - A f₀) = g₀
-    sorry
+    change A f₀ + (g₀ - A f₀) = g₀
+    simp [sub_eq_add_neg, add_left_comm]
   · -- Case i ≠ i₀: T(f i) = g i
-    -- We have A(f i - f₀) = g i - g₀ by construction (via Basis.constr)
-    -- So A(f i) = A(f i - f₀) + A(f₀) = (g i - g₀) + A(f₀)
-    -- Therefore T(f i) = A(f i) + (g₀ - A(f₀)) = (g i - g₀) + A(f₀) + (g₀ - A(f₀)) = g i
-    sorry
+    -- Key: A maps basis B_f to basis B_g, so A(f i - f₀) = g i - g₀
+    -- By definition of Basis.equiv, we have A (B_f j) = B_g j for all j
+    -- Since B_f ⟨i, h⟩ = f i - f₀ and B_g ⟨i, h⟩ = g i - g₀, we get A(f i - f₀) = g i - g₀
+
+    -- Basis.equiv maps basis elements to corresponding basis elements
+    have h_basis_map : A (f i - f₀) = g i - g₀ := by
+      -- A = B_f.equiv B_g (Equiv.refl _)
+      -- By definition, A (B_f j) = B_g ((Equiv.refl _) j) = B_g j
+      -- B_f and B_g are constructed from f_diff and g_diff via Basis.mk
+      -- So B_f ⟨i, h⟩ = f_diff ⟨i, h⟩ = f i - f₀
+      have h1 : A (B_f ⟨i, h⟩) = B_g ⟨i, h⟩ := by
+        -- Use Basis.equiv_apply or try grind
+        grind [Module.Basis.equiv_apply]
+      -- B_f ⟨i, h⟩ = f_diff ⟨i, h⟩ = f i - f₀ (by construction via Basis.mk)
+      -- Use Basis.mk_apply or Basis.coe_mk to relate B_f to f_diff
+      have h2 : B_f ⟨i, h⟩ = f_diff ⟨i, h⟩ := Module.Basis.mk_apply h_linear_indep_f h_span_f ⟨i, h⟩
+      have h3 : B_g ⟨i, h⟩ = g_diff ⟨i, h⟩ := Module.Basis.mk_apply h_linear_indep_g h_span_g ⟨i, h⟩
+      simp only [f_diff, g_diff] at h2 h3
+      rw [← h2, ← h3]
+      exact h1
+
+    -- Now prove T (f i) = g i using the mapping property
+    calc T (f i)
+        = A (f i) + (g₀ - A f₀)           := rfl
+      _ = A ((f i - f₀) + f₀) + (g₀ - A f₀)  := by rw [sub_add_cancel]
+      _ = A (f i - f₀) + A f₀ + (g₀ - A f₀) := by rw [LinearEquiv.map_add]
+      _ = (g i - g₀) + A f₀ + (g₀ - A f₀)   := by rw [h_basis_map]
+      _ = g i                               := by abel
 
 /-- **Rockafellar's Theorem 1.6**: Affinely independent sets of the same size can be mapped to each
 other by an affine automorphism of the ambient space.
