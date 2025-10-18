@@ -114,6 +114,7 @@ theorem affineDim_image_sub (v : E) (s : Set E) :
 ### Helper lemmas for affine independence
 -/
 
+omit [FiniteDimensional ℝ E] in
 /-- If an affine subspace is not equal to the whole space, then there exists a point
 not in the subspace. This is a consequence of the fact that a set that is not the
 universal set must have a point not in it. -/
@@ -127,49 +128,6 @@ lemma exists_point_not_mem_of_affineSubspace_ne_top
     exact h h_top
   -- Use the fact that a set ≠ univ iff there exists an element not in it
   exact (Set.ne_univ_iff_exists_notMem (S : Set E)).mp h_ne_univ
-
-/-- The cardinality of any affinely independent finite set in a finite-dimensional
-inner product space of dimension n is at most n + 1.
-
-This is a fundamental constraint: you can have at most dim(E) + 1 affinely independent
-points in E, which corresponds to a simplex of dimension dim(E). -/
-lemma affineIndependent_card_le_finrank_add_one
-    [FiniteDimensional ℝ E]
-    (s : Finset E)
-    (hs : AffineIndependent ℝ ((↑) : s → E)) :
-    s.card ≤ Module.finrank ℝ E + 1 := by
-  -- Strategy: Use AffineIndependent.affineSpan_eq_top_iff_card_eq_finrank_add_one
-  -- This tells us: if card = finrank + 1, then affineSpan = ⊤
-  -- Equivalently (contrapositive): if affineSpan ≠ ⊤, then card < finrank + 1
-  -- So we either have card ≤ finrank (when span ≠ ⊤) or card = finrank + 1 (when span = ⊤)
-  by_cases h_nonempty : s.Nonempty
-  · -- If s is nonempty, we can use affine dimension theory
-    by_cases h_span : affineSpan ℝ (range ((↑) : s → E)) = ⊤
-    · -- If affineSpan = ⊤, then by affineSpan_eq_top_iff_card_eq_finrank_add_one,
-      -- we have card = finrank + 1
-      have h_card_type : Fintype.card s = Module.finrank ℝ E + 1 :=
-        hs.affineSpan_eq_top_iff_card_eq_finrank_add_one.mp h_span
-      -- Relate Fintype.card to Finset.card
-      have h_card_eq : Fintype.card s = s.card := Fintype.card_coe s
-      omega
-    · -- If affineSpan ≠ ⊤, then the span is a proper affine subspace
-      -- The direction of a proper affine subspace has finrank < Module.finrank E
-      -- We have affineDim (range (↑)) = finrank of the direction
-      -- And for affinely independent families, card s - 1 = affineDim (range (↑))
-      -- Therefore card s ≤ Module.finrank E < Module.finrank E + 1
-
-      -- For affinely independent families, we have a relationship between card and affineDim
-      -- Specifically, for an affinely independent family indexed by a fintype,
-      -- we have affineDim (range f) + 1 = card ι
-
-      -- Since affineSpan ≠ ⊤, we know affineDim < Module.finrank E
-      -- Combined with card = affineDim + 1, we get card ≤ Module.finrank E < Module.finrank E + 1
-
-      -- This is a foundational result that should be in Mathlib, but if not,
-      -- we can prove it using the relationship between affine and linear independence
-      sorry
-  · -- If s is empty, then card = 0 ≤ finrank + 1
-    simp [Finset.not_nonempty_iff_eq_empty.mp h_nonempty]
 
 /-!
 ### Rockafellar's Theorem 1.6
@@ -351,6 +309,7 @@ theorem affineIndependent_indexed
       _ = (g i - g₀) + A f₀ + (g₀ - A f₀)   := by rw [h_basis_map]
       _ = g i                               := by abel
 
+omit [FiniteDimensional ℝ E] in
 /-- Extending an affinely independent family via Option preserves affine independence.
 
 If `f : ι → E` is affinely independent and `p ∉ affineSpan ℝ (range f)`, then the
