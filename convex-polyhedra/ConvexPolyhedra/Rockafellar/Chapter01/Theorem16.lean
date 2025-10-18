@@ -349,6 +349,67 @@ theorem affineIndependent_indexed
       _ = (g i - g₀) + A f₀ + (g₀ - A f₀)   := by rw [h_basis_map]
       _ = g i                               := by abel
 
+/-- Extending an affinely independent family via Option preserves affine independence.
+
+If `f : ι → E` is affinely independent and `p ∉ affineSpan ℝ (range f)`, then the
+extension `f' : Option ι → E` defined by `f' (some i) = f i` and `f' none = p`
+is also affinely independent.
+
+This is a key technical lemma used in the inductive proof of Rockafellar's Theorem 1.6. -/
+lemma affineIndependent_option_extend
+    {ι : Type*} [Fintype ι] [DecidableEq ι] [Nonempty ι]
+    {f : ι → E} (hf : AffineIndependent ℝ f)
+    {p : E} (hp : p ∉ affineSpan ℝ (range f))
+    (f' : Option ι → E)
+    (h_some : ∀ i : ι, f' (some i) = f i)
+    (h_none : f' none = p) :
+    AffineIndependent ℝ f' := by
+  -- Show the subfamily excluding `none` is affinely independent
+  have h_sub : AffineIndependent ℝ (fun x : {y : Option ι // y ≠ none} => f' x) := by
+    -- The restricted function equals f composed with Option.get
+    have : (fun x : {y : Option ι // y ≠ none} => f' x) =
+           f ∘ (fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop)) := by
+      ext ⟨x, hx⟩
+      cases x with
+      | some i => exact h_some i
+      | none => exact absurd rfl hx
+
+    rw [this]
+
+    -- Construct the embedding {y : Option ι // y ≠ none} ↪ ι
+    let e : {y : Option ι // y ≠ none} ↪ ι :=
+      ⟨fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop),
+       fun ⟨x, hx⟩ ⟨y, hy⟩ h_eq => by
+         simp only [Subtype.mk.injEq]
+         cases x with
+         | some i =>
+           cases y with
+           | some j => simp_all
+           | none => exact absurd rfl hy
+         | none => exact absurd rfl hx⟩
+
+    exact hf.comp_embedding e
+
+  -- Show f' none ∉ affineSpan ℝ (f' '' {x | x ≠ none})
+  have h_not_mem : f' none ∉ affineSpan ℝ (f' '' {x : Option ι | x ≠ none}) := by
+    -- The image equals range f
+    have h_image_eq : f' '' {x : Option ι | x ≠ none} = range f := by
+      ext y
+      simp only [mem_image, Set.mem_setOf_eq, mem_range]
+      constructor
+      · intro ⟨x, hx_ne, hx_eq⟩
+        cases x with
+        | none => contradiction
+        | some i => use i; rw [← h_some]; exact hx_eq
+      · intro ⟨i, hi⟩
+        use some i
+        exact ⟨Option.some_ne_none i, h_some i ▸ hi⟩
+    rw [h_image_eq, h_none]
+    exact hp
+
+  -- Apply the main theorem
+  exact AffineIndependent.affineIndependent_of_notMem_span h_sub h_not_mem
+
 /-- **Rockafellar's Theorem 1.6**: Affinely independent families of the same size can be
 mapped to each other by an affine automorphism of the ambient space.
 
@@ -439,108 +500,12 @@ private theorem affineIndependent_to_affineIndependent_automorphism_aux
         | none => p_g
         | some i => g i
 
-      -- Show that f' and g' are affinely independent
-      have hf' : AffineIndependent ℝ f' := by
-        -- Use AffineIndependent.affineIndependent_of_notMem_span (updated name)
-        -- Need to show:
-        -- 1. The subfamily excluding `none` is affinely independent
-        -- 2. f' none ∉ affineSpan ℝ (f' '' {x | x ≠ none})
+      -- Show that f' and g' are affinely independent using the helper lemma
+      have hf' : AffineIndependent ℝ f' :=
+        affineIndependent_option_extend hf hp_f f' (fun i => rfl) rfl
 
-        -- First, establish the subfamily affine independence
-        -- The subfamily {some i | i : ι} maps to f, which is affinely independent
-        have h_sub : AffineIndependent ℝ (fun x : {y : Option ι // y ≠ none} => f' x) := by
-          -- The function (fun x : {y : Option ι // y ≠ none} => f' x) is equal to f ∘ some
-          -- composed with projection from the subtype
-
-          -- Strategy: Use AffineIndependent.comp_embedding with Option.some
-          have h_eq : ∀ i : ι, f' (some i) = f i := by intro i; rfl
-
-          -- Show the subfamily equals f composed with the isomorphism {y // y ≠ none} ≃ ι
-          have : (fun x : {y : Option ι // y ≠ none} => f' x) =
-                 f ∘ (fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop)) := by
-            ext ⟨x, hx⟩
-            cases x with
-            | some i => rfl
-            | none => exact absurd rfl hx
-
-          rw [this]
-
-          -- Use comp_embedding with the extraction embedding
-          let e : {y : Option ι // y ≠ none} ↪ ι :=
-            ⟨fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop),
-             fun ⟨x, hx⟩ ⟨y, hy⟩ h_eq => by
-               simp only [Subtype.mk.injEq]
-               cases x with
-               | some i =>
-                 cases y with
-                 | some j => simp_all
-                 | none => exact absurd rfl hy
-               | none => exact absurd rfl hx⟩
-
-          exact hf.comp_embedding e
-
-        -- Second, show f' none ∉ affineSpan ℝ (f' '' {x | x ≠ none})
-        have h_not_mem : f' none ∉ affineSpan ℝ (f' '' {x : Option ι | x ≠ none}) := by
-          -- f' none = p_f
-          -- f' '' {x | x ≠ none} = {f' (some i) | i : ι} = {f i | i : ι} = range f
-          have h_image_eq : f' '' {x : Option ι | x ≠ none} = range f := by
-            ext y
-            simp only [mem_image, Set.mem_setOf_eq, mem_range]
-            constructor
-            · intro ⟨x, hx_ne, hx_eq⟩
-              cases x with
-              | none => contradiction
-              | some i => use i
-            · intro ⟨i, hi⟩
-              use some i
-              exact ⟨Option.some_ne_none i, hi⟩
-          rw [h_image_eq]
-          exact hp_f
-
-        -- Apply the theorem (using the updated non-deprecated name)
-        exact AffineIndependent.affineIndependent_of_notMem_span h_sub h_not_mem
-
-      have hg' : AffineIndependent ℝ g' := by
-        -- Same proof structure as for f'
-        have h_sub : AffineIndependent ℝ (fun x : {y : Option ι // y ≠ none} => g' x) := by
-          have : (fun x : {y : Option ι // y ≠ none} => g' x) =
-                 g ∘ (fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop)) := by
-            ext ⟨x, hx⟩
-            cases x with
-            | some i => rfl
-            | none => exact absurd rfl hx
-
-          rw [this]
-
-          let e : {y : Option ι // y ≠ none} ↪ ι :=
-            ⟨fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop),
-             fun ⟨x, hx⟩ ⟨y, hy⟩ h_eq => by
-               simp only [Subtype.mk.injEq]
-               cases x with
-               | some i =>
-                 cases y with
-                 | some j => simp_all
-                 | none => exact absurd rfl hy
-               | none => exact absurd rfl hx⟩
-
-          exact hg.comp_embedding e
-
-        have h_not_mem : g' none ∉ affineSpan ℝ (g' '' {x : Option ι | x ≠ none}) := by
-          have h_image_eq : g' '' {x : Option ι | x ≠ none} = range g := by
-            ext y
-            simp only [mem_image, Set.mem_setOf_eq, mem_range]
-            constructor
-            · intro ⟨x, hx_ne, hx_eq⟩
-              cases x with
-              | none => contradiction
-              | some i => use i
-            · intro ⟨i, hi⟩
-              use some i
-              exact ⟨Option.some_ne_none i, hi⟩
-          rw [h_image_eq]
-          exact hp_g
-
-        exact AffineIndependent.affineIndependent_of_notMem_span h_sub h_not_mem
+      have hg' : AffineIndependent ℝ g' :=
+        affineIndependent_option_extend hg hp_g g' (fun i => rfl) rfl
 
       -- The dimension gap for Option ι is n - 1
       have h_card_option : Fintype.card (Option ι) = Fintype.card ι + 1 := by
