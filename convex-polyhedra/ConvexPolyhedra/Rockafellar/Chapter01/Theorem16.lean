@@ -12,18 +12,15 @@ import ConvexPolyhedra.Polyhedron
 /-!
 # Rockafellar's Theorem 1.6
 
-This file contains Rockafellar's Theorem 1.6 from "Convex Analysis" (1970), which states that
-affinely independent sets can be mapped to each other by affine automorphisms of the ambient space.
+This file proves Rockafellar's Theorem 1.6 from "Convex Analysis" (1970): affinely independent
+families of the same size can be mapped to each other by affine automorphisms.
 
 ## Main results
 
-* `affineIndependent_to_affineIndependent_automorphism` - Rockafellar's Theorem 1.6:
-  Affinely independent sets of the same size can be mapped by an affine automorphism
-
-## Infrastructure
-
-* Affine dimension properties and translation invariance
-* Helper lemmas for affine dimension
+* `affineIndependent_indexed`: Two affinely independent families that span the entire space
+  can be mapped by an affine automorphism
+* `affineIndependent_option_extend`: Extending an affinely independent family with a point
+  outside its affine span preserves affine independence
 
 ## References
 
@@ -31,7 +28,7 @@ affinely independent sets can be mapped to each other by affine automorphisms of
 
 ## Tags
 
-affine, affine independence, affine dimension, affine transformation
+affine independence, affine automorphism, affine dimension
 -/
 
 open Set AffineSubspace
@@ -43,12 +40,7 @@ variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDim
 ### Affine dimension properties
 -/
 
-/-- Affine dimension is monotone with respect to inclusion in affine spans.
-
-If s ⊆ affineSpan ℝ t, then affineDim ℝ s ≤ affineDim ℝ t.
-
-This follows from the fact that affineSpan is monotone and idempotent, combined with
-the relationship between affine dimension and the dimension of the direction submodule. -/
+/-- Affine dimension is monotone: if `s ⊆ affineSpan ℝ t`, then `affineDim ℝ s ≤ affineDim ℝ t`. -/
 theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan ℝ t) :
     affineDim ℝ s ≤ affineDim ℝ t := by
   -- Use affineSpan_mono to get affineSpan ℝ s ≤ affineSpan ℝ (affineSpan ℝ t)
@@ -66,10 +58,7 @@ theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan �
   exact_mod_cast Submodule.finrank_mono h4
 
 omit [FiniteDimensional ℝ E] in
-/-- Translation preserves affine dimension (via pointwise vadd).
-
-For any set s and vector v, translating s by v preserves affine dimension.
-This is because translation is an affine equivalence that preserves affine structure. -/
+/-- Translation preserves affine dimension: `affineDim ℝ (v +ᵥ s) = affineDim ℝ s`. -/
 theorem affineDim_vadd (v : E) (s : Set E) :
     affineDim ℝ (v +ᵥ s) = affineDim ℝ s := by
   -- affineSpan (v +ᵥ s) = v +ᵥ affineSpan s (by pointwise_vadd_span)
@@ -83,19 +72,13 @@ theorem affineDim_vadd (v : E) (s : Set E) :
   rw [h_span, h_dir]
 
 omit [FiniteDimensional ℝ E] in
-/-- Translation preserves affine dimension (via vsub/negation).
-
-For any set s and vector v, we have affineDim((-v) +ᵥ s) = affineDim(s).
-This follows immediately from affineDim_vadd. -/
+/-- Translation preserves affine dimension: `affineDim ℝ ((-v) +ᵥ s) = affineDim ℝ s`. -/
 theorem affineDim_neg_vadd (v : E) (s : Set E) :
     affineDim ℝ ((-v) +ᵥ s) = affineDim ℝ s :=
   affineDim_vadd (-v) s
 
 omit [FiniteDimensional ℝ E] in
-/-- Translation preserves affine dimension (via image under subtraction map).
-
-For any set s and vector v, translating s by the map y ↦ y - v preserves affine dimension.
-This is a corollary of affineDim_vadd since (y - v) = y + (-v) = (-v) +ᵥ y. -/
+/-- Translation preserves affine dimension: `affineDim ℝ ((y ↦ y - v) '' s) = affineDim ℝ s`. -/
 theorem affineDim_image_sub (v : E) (s : Set E) :
     affineDim ℝ ((fun y => y - v) '' s) = affineDim ℝ s := by
   -- The image {y - v | y ∈ s} equals (-v) +ᵥ s
@@ -115,9 +98,7 @@ theorem affineDim_image_sub (v : E) (s : Set E) :
 -/
 
 omit [FiniteDimensional ℝ E] in
-/-- If an affine subspace is not equal to the whole space, then there exists a point
-not in the subspace. This is a consequence of the fact that a set that is not the
-universal set must have a point not in it. -/
+/-- A proper affine subspace does not contain all points. -/
 lemma exists_point_not_mem_of_affineSubspace_ne_top
     (S : AffineSubspace ℝ E) (h : S ≠ ⊤) :
     ∃ p : E, p ∉ S := by
@@ -133,15 +114,8 @@ lemma exists_point_not_mem_of_affineSubspace_ne_top
 ### Rockafellar's Theorem 1.6
 -/
 
-/-- Given two affinely independent families with the same index type that both span
-the entire space, there exists an affine automorphism mapping one to the other.
-
-This is the base case of Rockafellar's Theorem 1.6, reformulated to work naturally
-with the `AffineBasis` API. The key insight is that affine bases with the same
-index type determine a unique affine automorphism between them.
-
-This theorem is the affine analogue of the linear algebra fact that a bijection
-between two bases of a vector space extends uniquely to a linear automorphism. -/
+/-- Two affinely independent families with the same index type that both span the entire
+space can be mapped to each other by an affine automorphism. -/
 theorem affineIndependent_indexed
     {ι : Type*} [Fintype ι] [DecidableEq ι] [Nonempty ι]
     (f g : ι → E)
@@ -310,13 +284,8 @@ theorem affineIndependent_indexed
       _ = g i                               := by abel
 
 omit [FiniteDimensional ℝ E] in
-/-- Extending an affinely independent family via Option preserves affine independence.
-
-If `f : ι → E` is affinely independent and `p ∉ affineSpan ℝ (range f)`, then the
-extension `f' : Option ι → E` defined by `f' (some i) = f i` and `f' none = p`
-is also affinely independent.
-
-This is a key technical lemma used in the inductive proof of Rockafellar's Theorem 1.6. -/
+/-- Extending an affinely independent family with a point outside its affine span preserves
+affine independence. -/
 lemma affineIndependent_option_extend
     {ι : Type*} [Fintype ι] [DecidableEq ι] [Nonempty ι]
     {f : ι → E} (hf : AffineIndependent ℝ f)
@@ -372,28 +341,10 @@ lemma affineIndependent_option_extend
   exact AffineIndependent.affineIndependent_of_notMem_span h_sub h_not_mem
 
 /-- **Rockafellar's Theorem 1.6**: Affinely independent families of the same size can be
-mapped to each other by an affine automorphism of the ambient space.
+mapped to each other by an affine automorphism.
 
-Given two affinely independent families f, g : ι → E with the same finite index type ι,
-there exists an affine automorphism T : E ≃ᵃ[ℝ] E such that T ∘ f = g
-(i.e., T (f i) = g i for all i).
-
-This is the most general form of Rockafellar's Theorem 1.6 from "Convex Analysis" (1970).
-Unlike `affineIndependent_indexed`, this theorem does NOT require the families to span
-the entire space - it works for any affinely independent families with the same cardinality.
-
-The key difference from `affineIndependent_indexed`:
-- `affineIndependent_indexed`: Requires both families span ⊤
-  (base case for full-dimensional families)
-- `affineIndependent_to_affineIndependent_automorphism`: Works for ANY affinely
-  independent families
-
-The proof proceeds by induction on the "dimension gap" n = (finrank E + 1) - card ι:
-- Base case (n = 0): Both families have card ι = finrank E + 1, so they span the
-  entire space. Apply `affineIndependent_indexed` directly.
-- Inductive step (n > 0): The families don't span the entire space. Find points outside
-  their affine spans, extend both families, apply the IH, and use the restriction property.
--/
+Given two affinely independent families `f, g : ι → E` with the same finite index type,
+there exists an affine automorphism `T : E ≃ᵃ[ℝ] E` such that `T (f i) = g i` for all `i`. -/
 -- Helper lemma for the induction
 private theorem affineIndependent_to_affineIndependent_automorphism_aux
     (n : ℕ)
