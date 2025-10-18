@@ -145,7 +145,8 @@ lemma affineIndependent_card_le_finrank_add_one
   by_cases h_nonempty : s.Nonempty
   · -- If s is nonempty, we can use affine dimension theory
     by_cases h_span : affineSpan ℝ (range ((↑) : s → E)) = ⊤
-    · -- If affineSpan = ⊤, then by affineSpan_eq_top_iff_card_eq_finrank_add_one, card = finrank + 1
+    · -- If affineSpan = ⊤, then by affineSpan_eq_top_iff_card_eq_finrank_add_one,
+      -- we have card = finrank + 1
       have h_card_type : Fintype.card s = Module.finrank ℝ E + 1 :=
         hs.affineSpan_eq_top_iff_card_eq_finrank_add_one.mp h_span
       -- Relate Fintype.card to Finset.card
@@ -322,7 +323,8 @@ theorem affineIndependent_indexed
   · -- Case i ≠ i₀: T(f i) = g i
     -- Key: A maps basis B_f to basis B_g, so A(f i - f₀) = g i - g₀
     -- By definition of Basis.equiv, we have A (B_f j) = B_g j for all j
-    -- Since B_f ⟨i, h⟩ = f i - f₀ and B_g ⟨i, h⟩ = g i - g₀, we get A(f i - f₀) = g i - g₀
+    -- Since B_f ⟨i, h⟩ = f i - f₀ and B_g ⟨i, h⟩ = g i - g₀,
+    -- we get A(f i - f₀) = g i - g₀
 
     -- Basis.equiv maps basis elements to corresponding basis elements
     have h_basis_map : A (f i - f₀) = g i - g₀ := by
