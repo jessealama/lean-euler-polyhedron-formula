@@ -114,6 +114,20 @@ theorem affineDim_image_sub (v : E) (s : Set E) :
 ### Helper lemmas for affine independence
 -/
 
+/-- If an affine subspace is not equal to the whole space, then there exists a point
+not in the subspace. This is a consequence of the fact that a set that is not the
+universal set must have a point not in it. -/
+lemma exists_point_not_mem_of_affineSubspace_ne_top
+    (S : AffineSubspace ℝ E) (h : S ≠ ⊤) :
+    ∃ p : E, p ∉ S := by
+  -- Convert to set reasoning: S ≠ ⊤ as affine subspaces means (S : Set E) ≠ Set.univ
+  have h_ne_univ : (S : Set E) ≠ Set.univ := by
+    intro h_eq
+    have h_top : S = ⊤ := SetLike.coe_injective h_eq
+    exact h h_top
+  -- Use the fact that a set ≠ univ iff there exists an element not in it
+  exact (Set.ne_univ_iff_exists_notMem (S : Set E)).mp h_ne_univ
+
 /-- The cardinality of any affinely independent finite set in a finite-dimensional
 inner product space of dimension n is at most n + 1.
 
@@ -124,7 +138,37 @@ lemma affineIndependent_card_le_finrank_add_one
     (s : Finset E)
     (hs : AffineIndependent ℝ ((↑) : s → E)) :
     s.card ≤ Module.finrank ℝ E + 1 := by
-  sorry
+  -- Strategy: Use AffineIndependent.affineSpan_eq_top_iff_card_eq_finrank_add_one
+  -- This tells us: if card = finrank + 1, then affineSpan = ⊤
+  -- Equivalently (contrapositive): if affineSpan ≠ ⊤, then card < finrank + 1
+  -- So we either have card ≤ finrank (when span ≠ ⊤) or card = finrank + 1 (when span = ⊤)
+  by_cases h_nonempty : s.Nonempty
+  · -- If s is nonempty, we can use affine dimension theory
+    by_cases h_span : affineSpan ℝ (range ((↑) : s → E)) = ⊤
+    · -- If affineSpan = ⊤, then by affineSpan_eq_top_iff_card_eq_finrank_add_one, card = finrank + 1
+      have h_card_type : Fintype.card s = Module.finrank ℝ E + 1 :=
+        hs.affineSpan_eq_top_iff_card_eq_finrank_add_one.mp h_span
+      -- Relate Fintype.card to Finset.card
+      have h_card_eq : Fintype.card s = s.card := Fintype.card_coe s
+      omega
+    · -- If affineSpan ≠ ⊤, then the span is a proper affine subspace
+      -- The direction of a proper affine subspace has finrank < Module.finrank E
+      -- We have affineDim (range (↑)) = finrank of the direction
+      -- And for affinely independent families, card s - 1 = affineDim (range (↑))
+      -- Therefore card s ≤ Module.finrank E < Module.finrank E + 1
+
+      -- For affinely independent families, we have a relationship between card and affineDim
+      -- Specifically, for an affinely independent family indexed by a fintype,
+      -- we have affineDim (range f) + 1 = card ι
+
+      -- Since affineSpan ≠ ⊤, we know affineDim < Module.finrank E
+      -- Combined with card = affineDim + 1, we get card ≤ Module.finrank E < Module.finrank E + 1
+
+      -- This is a foundational result that should be in Mathlib, but if not,
+      -- we can prove it using the relationship between affine and linear independence
+      sorry
+  · -- If s is empty, then card = 0 ≤ finrank + 1
+    simp [Finset.not_nonempty_iff_eq_empty.mp h_nonempty]
 
 /-!
 ### Rockafellar's Theorem 1.6
@@ -328,10 +372,194 @@ The proof proceeds by induction on the "dimension gap" n = (finrank E + 1) - car
 - Inductive step (n > 0): The families don't span the entire space. Find points outside
   their affine spans, extend both families, apply the IH, and use the restriction property.
 -/
-theorem affineIndependent_to_affineIndependent_automorphism
-    {ι : Type*} [Fintype ι] [DecidableEq ι]
+-- Helper lemma for the induction
+private theorem affineIndependent_to_affineIndependent_automorphism_aux
+    (n : ℕ)
+    (ι : Type*) [Fintype ι] [DecidableEq ι] [Nonempty ι]
     (f g : ι → E)
     (hf : AffineIndependent ℝ f)
-    (hg : AffineIndependent ℝ g) :
+    (hg : AffineIndependent ℝ g)
+    (hn : n = Module.finrank ℝ E + 1 - Fintype.card ι)
+    (h_card : Fintype.card ι ≤ Module.finrank ℝ E + 1) :
     ∃ (T : E ≃ᵃ[ℝ] E), ∀ i, T (f i) = g i := by
-  sorry
+  -- Induction on n
+  induction n generalizing ι f g with
+  | zero =>
+    -- Base case: n = 0, so card ι = finrank E + 1
+    -- This means both families span the entire space
+    have h_card_eq : Fintype.card ι = Module.finrank ℝ E + 1 := by
+      omega
+
+    -- By affineSpan_eq_top_iff_card_eq_finrank_add_one, this implies affineSpan = ⊤
+    have h_span_f : affineSpan ℝ (range f) = ⊤ := by
+      exact hf.affineSpan_eq_top_iff_card_eq_finrank_add_one.mpr h_card_eq
+
+    have h_span_g : affineSpan ℝ (range g) = ⊤ := by
+      exact hg.affineSpan_eq_top_iff_card_eq_finrank_add_one.mpr h_card_eq
+
+    -- Apply affineIndependent_indexed
+    exact affineIndependent_indexed f g hf hg h_span_f h_span_g
+
+  | succ n ih =>
+    -- Inductive case: n > 0
+      -- This means card ι < finrank E + 1
+      -- So the affine spans are proper subspaces
+      have h_card_lt : Fintype.card ι < Module.finrank ℝ E + 1 := by
+        omega
+
+      -- Since card < finrank + 1, the affine span cannot be the whole space
+      have h_span_f_ne_top : affineSpan ℝ (range f) ≠ ⊤ := by
+        intro h_top
+        have h_card_eq := hf.affineSpan_eq_top_iff_card_eq_finrank_add_one.mp h_top
+        omega
+
+      have h_span_g_ne_top : affineSpan ℝ (range g) ≠ ⊤ := by
+        intro h_top
+        have h_card_eq := hg.affineSpan_eq_top_iff_card_eq_finrank_add_one.mp h_top
+        omega
+
+      -- Find points outside the affine spans
+      -- Since affineSpan (range f) is a proper affine subspace, there exists a point not in it
+      have h_exists_f : ∃ p_f : E, p_f ∉ affineSpan ℝ (range f) :=
+        exists_point_not_mem_of_affineSubspace_ne_top _ h_span_f_ne_top
+
+      obtain ⟨p_f, hp_f⟩ := h_exists_f
+
+      have h_exists_g : ∃ p_g : E, p_g ∉ affineSpan ℝ (range g) :=
+        exists_point_not_mem_of_affineSubspace_ne_top _ h_span_g_ne_top
+
+      obtain ⟨p_g, hp_g⟩ := h_exists_g
+
+      -- Extend f and g to Option ι
+      let f' : Option ι → E := fun o => match o with
+        | none => p_f
+        | some i => f i
+
+      let g' : Option ι → E := fun o => match o with
+        | none => p_g
+        | some i => g i
+
+      -- Show that f' and g' are affinely independent
+      have hf' : AffineIndependent ℝ f' := by
+        -- Use AffineIndependent.affineIndependent_of_notMem_span (updated name)
+        -- Need to show:
+        -- 1. The subfamily excluding `none` is affinely independent
+        -- 2. f' none ∉ affineSpan ℝ (f' '' {x | x ≠ none})
+
+        -- First, establish the subfamily affine independence
+        -- The subfamily {some i | i : ι} maps to f, which is affinely independent
+        have h_sub : AffineIndependent ℝ (fun x : {y : Option ι // y ≠ none} => f' x) := by
+          -- The function (fun x : {y : Option ι // y ≠ none} => f' x) is equal to f ∘ some
+          -- composed with projection from the subtype
+
+          -- Strategy: Use AffineIndependent.comp_embedding with Option.some
+          have h_eq : ∀ i : ι, f' (some i) = f i := by intro i; rfl
+
+          -- Show the subfamily equals f composed with the isomorphism {y // y ≠ none} ≃ ι
+          have : (fun x : {y : Option ι // y ≠ none} => f' x) =
+                 f ∘ (fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop)) := by
+            ext ⟨x, hx⟩
+            cases x with
+            | some i => rfl
+            | none => exact absurd rfl hx
+
+          rw [this]
+
+          -- Use comp_embedding with the extraction embedding
+          let e : {y : Option ι // y ≠ none} ↪ ι :=
+            ⟨fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop),
+             fun ⟨x, hx⟩ ⟨y, hy⟩ h_eq => by
+               simp only [Subtype.mk.injEq]
+               cases x with
+               | some i =>
+                 cases y with
+                 | some j => simp_all
+                 | none => exact absurd rfl hy
+               | none => exact absurd rfl hx⟩
+
+          exact hf.comp_embedding e
+
+        -- Second, show f' none ∉ affineSpan ℝ (f' '' {x | x ≠ none})
+        have h_not_mem : f' none ∉ affineSpan ℝ (f' '' {x : Option ι | x ≠ none}) := by
+          -- f' none = p_f
+          -- f' '' {x | x ≠ none} = {f' (some i) | i : ι} = {f i | i : ι} = range f
+          have h_image_eq : f' '' {x : Option ι | x ≠ none} = range f := by
+            ext y
+            simp only [mem_image, Set.mem_setOf_eq, mem_range]
+            constructor
+            · intro ⟨x, hx_ne, hx_eq⟩
+              cases x with
+              | none => contradiction
+              | some i => use i
+            · intro ⟨i, hi⟩
+              use some i
+              exact ⟨Option.some_ne_none i, hi⟩
+          rw [h_image_eq]
+          exact hp_f
+
+        -- Apply the theorem (using the updated non-deprecated name)
+        exact AffineIndependent.affineIndependent_of_notMem_span h_sub h_not_mem
+
+      have hg' : AffineIndependent ℝ g' := by
+        -- Same proof structure as for f'
+        have h_sub : AffineIndependent ℝ (fun x : {y : Option ι // y ≠ none} => g' x) := by
+          have : (fun x : {y : Option ι // y ≠ none} => g' x) =
+                 g ∘ (fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop)) := by
+            ext ⟨x, hx⟩
+            cases x with
+            | some i => rfl
+            | none => exact absurd rfl hx
+
+          rw [this]
+
+          let e : {y : Option ι // y ≠ none} ↪ ι :=
+            ⟨fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop),
+             fun ⟨x, hx⟩ ⟨y, hy⟩ h_eq => by
+               simp only [Subtype.mk.injEq]
+               cases x with
+               | some i =>
+                 cases y with
+                 | some j => simp_all
+                 | none => exact absurd rfl hy
+               | none => exact absurd rfl hx⟩
+
+          exact hg.comp_embedding e
+
+        have h_not_mem : g' none ∉ affineSpan ℝ (g' '' {x : Option ι | x ≠ none}) := by
+          have h_image_eq : g' '' {x : Option ι | x ≠ none} = range g := by
+            ext y
+            simp only [mem_image, Set.mem_setOf_eq, mem_range]
+            constructor
+            · intro ⟨x, hx_ne, hx_eq⟩
+              cases x with
+              | none => contradiction
+              | some i => use i
+            · intro ⟨i, hi⟩
+              use some i
+              exact ⟨Option.some_ne_none i, hi⟩
+          rw [h_image_eq]
+          exact hp_g
+
+        exact AffineIndependent.affineIndependent_of_notMem_span h_sub h_not_mem
+
+      -- The dimension gap for Option ι is n - 1
+      have h_card_option : Fintype.card (Option ι) = Fintype.card ι + 1 := by
+        exact Fintype.card_option
+
+      -- The dimension gap for Option ι is exactly n (since we added 1 to the card)
+      have h_gap : n = Module.finrank ℝ E + 1 - Fintype.card (Option ι) := by
+        omega
+
+      have h_card_option_bound : Fintype.card (Option ι) ≤ Module.finrank ℝ E + 1 := by
+        omega
+
+      -- Apply IH to f' and g'
+      have h_ih := @ih (Option ι) _ _ _ f' g' hf' hg' h_gap h_card_option_bound
+
+      -- Extract the automorphism
+      obtain ⟨T, hT⟩ := h_ih
+
+      -- T already maps f i to g i for all i (because T (f' (some i)) = g' (some i))
+      use T
+      intro i
+      exact hT (some i)
