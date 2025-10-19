@@ -412,7 +412,7 @@ mapped to each other by an affine automorphism.
 Given two affinely independent families `f, g : ι → E` with the same finite index type,
 there exists an affine automorphism `T : E ≃ᵃ[ℝ] E` such that `T (f i) = g i` for all `i`. -/
 -- Helper lemma for the induction
-private theorem affineIndependent_to_affineIndependent_automorphism_aux
+theorem affineIndependent_to_affineIndependent_automorphism_aux
     (n : ℕ)
     (ι : Type*) [Fintype ι] [DecidableEq ι] [Nonempty ι]
     (f g : ι → E)
