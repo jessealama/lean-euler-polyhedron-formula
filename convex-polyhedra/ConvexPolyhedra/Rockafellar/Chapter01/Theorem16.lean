@@ -413,14 +413,17 @@ Given two affinely independent families `f, g : ι → E` with the same finite i
 there exists an affine automorphism `T : E ≃ᵃ[ℝ] E` such that `T (f i) = g i` for all `i`. -/
 -- Helper lemma for the induction
 theorem affineIndependent_to_affineIndependent_automorphism_aux
-    (n : ℕ)
     (ι : Type*) [Fintype ι] [DecidableEq ι]
     (f g : ι → E)
     (hf : AffineIndependent ℝ f)
     (hg : AffineIndependent ℝ g)
-    (hn : n = Module.finrank ℝ E + 1 - Fintype.card ι)
     (h_card : Fintype.card ι ≤ Module.finrank ℝ E + 1) :
     ∃ (T : E ≃ᵃ[ℝ] E), ∀ i, T (f i) = g i := by
+  -- We proceed by induction on the dimension gap n = finrank E + 1 - card ι
+  suffices ∀ n, n = Module.finrank ℝ E + 1 - Fintype.card ι →
+    ∃ (T : E ≃ᵃ[ℝ] E), ∀ i, T (f i) = g i by
+    exact this _ rfl
+  intro n hn
   -- Induction on n
   induction n generalizing ι f g with
   | zero =>
@@ -506,7 +509,7 @@ theorem affineIndependent_to_affineIndependent_automorphism_aux
       have h_card_option_bound : Fintype.card (Option ι) ≤ Module.finrank ℝ E + 1 := by omega
 
       -- Apply IH to f' and g'
-      obtain ⟨T, hT⟩ := @ih (Option ι) _ _ f' g' hf' hg' h_gap h_card_option_bound
+      obtain ⟨T, hT⟩ := @ih (Option ι) _ _ f' g' hf' hg' h_card_option_bound h_gap
 
       -- T already maps f i to g i for all i
       use T
