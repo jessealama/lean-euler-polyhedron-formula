@@ -406,20 +406,36 @@ theorem affineIndependent_indexed
       _ = (g i - g₀) + A f₀ + (g₀ - A f₀)   := by rw [h_basis_map]
       _ = g i                               := by abel
 
-/-- Helper for Rockafellar's Theorem 1.6. Performs induction on the dimension gap. -/
-private theorem affineIndependent_to_affineIndependent_automorphism_aux_with_card
-    (n : ℕ)
+/-- An affinely independent family in a finite-dimensional space has cardinality at most
+`finrank + 1`. -/
+lemma AffineIndependent.card_le_finrank_add_one
+    {ι : Type*} [Fintype ι] {f : ι → E} (hf : AffineIndependent ℝ f) :
+    Fintype.card ι ≤ Module.finrank ℝ E + 1 := by
+  calc Fintype.card ι
+      ≤ Module.finrank ℝ (vectorSpan ℝ (Set.range f)) + 1 := hf.card_le_finrank_succ
+    _ ≤ Module.finrank ℝ E + 1 := by
+        apply Nat.add_le_add_right
+        exact Submodule.finrank_le _
+
+/-- **Rockafellar's Theorem 1.6**: Affinely independent families of the same size can be
+mapped to each other by an affine automorphism.
+
+Given two affinely independent families `f, g : ι → E` with the same finite index type,
+there exists an affine automorphism `T : E ≃ᵃ[ℝ] E` such that `T (f i) = g i` for all `i`. -/
+theorem affineIndependent_to_affineIndependent_automorphism
     (ι : Type*) [Fintype ι] [DecidableEq ι]
     (f g : ι → E)
     (hf : AffineIndependent ℝ f)
-    (hg : AffineIndependent ℝ g)
-    (hn : n = Module.finrank ℝ E + 1 - Fintype.card ι)
-    (h_card : Fintype.card ι ≤ Module.finrank ℝ E + 1) :
+    (hg : AffineIndependent ℝ g) :
     ∃ (T : E ≃ᵃ[ℝ] E), ∀ i, T (f i) = g i := by
-  -- Induction on n
-  induction n generalizing ι f g with
+  have h_card_bound : Fintype.card ι ≤ Module.finrank ℝ E + 1 := hf.card_le_finrank_add_one
+  -- Induction on the dimension gap
+  induction h : Module.finrank ℝ E + 1 - Fintype.card ι generalizing ι f g with
   | zero =>
-    -- Base case: n = 0, so card ι = finrank E + 1
+    -- Base case: dimension gap = 0, so card ι = finrank E + 1
+    -- h : Module.finrank ℝ E + 1 - Fintype.card ι = 0
+    have h_lower : Module.finrank ℝ E + 1 ≤ Fintype.card ι := by
+      exact Nat.sub_eq_zero_iff_le.mp h
     -- Case split on whether ι is empty
     by_cases h_empty : IsEmpty ι
     · -- If ι is empty, the conclusion is vacuous
@@ -441,7 +457,11 @@ private theorem affineIndependent_to_affineIndependent_automorphism_aux_with_car
       exact affineIndependent_indexed f g hf hg h_span_f h_span_g
 
   | succ n ih =>
-    -- Inductive case: n > 0
+    -- Inductive case: dimension gap = n + 1 > 0
+    -- h : Module.finrank ℝ E + 1 - Fintype.card ι = n + 1
+    have h_gap : 0 < Module.finrank ℝ E + 1 - Fintype.card ι := by
+      rw [h]
+      omega
     -- Case split on whether ι is empty
     by_cases h_empty : IsEmpty ι
     · -- If ι is empty, the conclusion is vacuous
@@ -496,41 +516,19 @@ private theorem affineIndependent_to_affineIndependent_automorphism_aux_with_car
       have h_card_option : Fintype.card (Option ι) = Fintype.card ι + 1 := by
         exact Fintype.card_option
 
-      have h_gap : n = Module.finrank ℝ E + 1 - Fintype.card (Option ι) := by omega
-
       have h_card_option_bound : Fintype.card (Option ι) ≤ Module.finrank ℝ E + 1 := by omega
 
+      -- Compute the gap for Option ι
+      have h_gap_option : Module.finrank ℝ E + 1 - Fintype.card (Option ι) = n := by
+        rw [h_card_option]
+        omega
+
       -- Apply IH to f' and g'
-      obtain ⟨T, hT⟩ := @ih (Option ι) _ _ f' g' hf' hg' h_gap h_card_option_bound
+      obtain ⟨T, hT⟩ := @ih (Option ι) _ _ f' g' hf' hg' h_card_option_bound h_gap_option
 
       -- T already maps f i to g i for all i
       use T
       intro i
       exact hT (some i)
-
-/-- An affinely independent family in a finite-dimensional space has cardinality at most
-`finrank + 1`. -/
-lemma AffineIndependent.card_le_finrank_add_one
-    {ι : Type*} [Fintype ι] {f : ι → E} (hf : AffineIndependent ℝ f) :
-    Fintype.card ι ≤ Module.finrank ℝ E + 1 := by
-  calc Fintype.card ι
-      ≤ Module.finrank ℝ (vectorSpan ℝ (Set.range f)) + 1 := hf.card_le_finrank_succ
-    _ ≤ Module.finrank ℝ E + 1 := by
-        apply Nat.add_le_add_right
-        exact Submodule.finrank_le _
-
-/-- **Rockafellar's Theorem 1.6**: Affinely independent families of the same size can be
-mapped to each other by an affine automorphism.
-
-Given two affinely independent families `f, g : ι → E` with the same finite index type,
-there exists an affine automorphism `T : E ≃ᵃ[ℝ] E` such that `T (f i) = g i` for all `i`. -/
-theorem affineIndependent_to_affineIndependent_automorphism_aux
-    (ι : Type*) [Fintype ι] [DecidableEq ι]
-    (f g : ι → E)
-    (hf : AffineIndependent ℝ f)
-    (hg : AffineIndependent ℝ g) :
-    ∃ (T : E ≃ᵃ[ℝ] E), ∀ i, T (f i) = g i := by
-  exact affineIndependent_to_affineIndependent_automorphism_aux_with_card
-    _ ι f g hf hg rfl hf.card_le_finrank_add_one
 
 end FiniteDimensional
