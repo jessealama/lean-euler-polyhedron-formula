@@ -15,12 +15,20 @@ import ConvexPolyhedra.Polyhedron
 This file proves Rockafellar's Theorem 1.6 from "Convex Analysis" (1970): affinely independent
 families of the same size can be mapped to each other by affine automorphisms.
 
+The file is organized into two sections:
+1. **General Results**: Theorems that hold for any affine space (no finite-dimensionality required)
+2. **Finite-Dimensional Results**: Theorems specific to finite-dimensional spaces
+
 ## Main results
 
+### General (any dimension)
+* `AffineMap.eq_of_eq_on_spanning`: Affine maps uniquely determined by values on spanning sets
+* `AffineEquiv.eq_of_eq_on_spanning`: Affine automorphisms uniquely determined on spanning sets
+* `affineIndependent_option_extend`: Extending affinely independent families preserves independence
+
+### Finite-dimensional
 * `affineIndependent_indexed`: Two affinely independent families that span the entire space
-  can be mapped by an affine automorphism
-* `affineIndependent_option_extend`: Extending an affinely independent family with a point
-  outside its affine span preserves affine independence
+  can be mapped by an affine automorphism (Rockafellar's Theorem 1.6)
 
 ## References
 
@@ -34,30 +42,20 @@ affine independence, affine automorphism, affine dimension
 open Set AffineSubspace
 open scoped Pointwise
 
-variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
 
 /-!
-### Affine dimension properties
+## General Results
+
+These theorems hold for affine spaces of any dimension (including infinite-dimensional spaces).
 -/
 
-/-- Affine dimension is monotone: if `s ⊆ affineSpan ℝ t`, then `affineDim ℝ s ≤ affineDim ℝ t`. -/
-theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan ℝ t) :
-    affineDim ℝ s ≤ affineDim ℝ t := by
-  -- Use affineSpan_mono to get affineSpan ℝ s ≤ affineSpan ℝ (affineSpan ℝ t)
-  have h1 : affineSpan ℝ s ≤ affineSpan ℝ (affineSpan ℝ t) := affineSpan_mono ℝ h
-  -- Use idempotence: affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t
-  have h2 : affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t := AffineSubspace.affineSpan_coe _
-  -- Combine to get affineSpan ℝ s ≤ affineSpan ℝ t
-  have h3 : affineSpan ℝ s ≤ affineSpan ℝ t := h2 ▸ h1
-  -- Apply direction_le to get direction ordering
-  have h4 : (affineSpan ℝ s).direction ≤ (affineSpan ℝ t).direction :=
-    AffineSubspace.direction_le h3
-  -- Use finrank monotonicity on submodules
-  -- affineDim is defined as Module.finrank of the direction
-  simp only [affineDim]
-  exact_mod_cast Submodule.finrank_mono h4
+section General
 
-omit [FiniteDimensional ℝ E] in
+/-!
+### Translation invariance of affine dimension
+-/
+
 /-- Translation preserves affine dimension: `affineDim ℝ (v +ᵥ s) = affineDim ℝ s`. -/
 theorem affineDim_vadd (v : E) (s : Set E) :
     affineDim ℝ (v +ᵥ s) = affineDim ℝ s := by
@@ -71,13 +69,11 @@ theorem affineDim_vadd (v : E) (s : Set E) :
   simp only [affineDim]
   rw [h_span, h_dir]
 
-omit [FiniteDimensional ℝ E] in
 /-- Translation preserves affine dimension: `affineDim ℝ ((-v) +ᵥ s) = affineDim ℝ s`. -/
 theorem affineDim_neg_vadd (v : E) (s : Set E) :
     affineDim ℝ ((-v) +ᵥ s) = affineDim ℝ s :=
   affineDim_vadd (-v) s
 
-omit [FiniteDimensional ℝ E] in
 /-- Translation preserves affine dimension: `affineDim ℝ ((y ↦ y - v) '' s) = affineDim ℝ s`. -/
 theorem affineDim_image_sub (v : E) (s : Set E) :
     affineDim ℝ ((fun y => y - v) '' s) = affineDim ℝ s := by
@@ -97,7 +93,6 @@ theorem affineDim_image_sub (v : E) (s : Set E) :
 ### Helper lemmas for affine independence
 -/
 
-omit [FiniteDimensional ℝ E] in
 /-- A proper affine subspace does not contain all points. -/
 lemma exists_point_not_mem_of_affineSubspace_ne_top
     (S : AffineSubspace ℝ E) (h : S ≠ ⊤) :
@@ -111,10 +106,9 @@ lemma exists_point_not_mem_of_affineSubspace_ne_top
   exact (Set.ne_univ_iff_exists_notMem (S : Set E)).mp h_ne_univ
 
 /-!
-### Rockafellar's Theorem 1.6
+### Uniqueness of affine maps on spanning sets
 -/
 
-set_option linter.unusedSectionVars false in
 /-- **Uniqueness of affine maps on spanning sets**: If two affine maps agree on a set that
 spans the entire space, then they are equal.
 
@@ -146,7 +140,6 @@ theorem AffineMap.eq_of_eq_on_spanning
   have : (f ∘ p : ι → P₂) = (g ∘ p : ι → P₂) := funext h_agree
   rw [this]
 
-set_option linter.unusedSectionVars false in
 /-- **Uniqueness of affine automorphisms on spanning sets**: If two affine automorphisms
 agree on a set that spans the entire space, then they are equal.
 
@@ -162,6 +155,103 @@ theorem AffineEquiv.eq_of_eq_on_spanning
   rw [← AffineEquiv.toAffineMap_inj]
   -- Apply the general theorem for affine maps
   exact AffineMap.eq_of_eq_on_spanning p h_span T₁.toAffineMap T₂.toAffineMap h_agree
+
+/-!
+### Extending affinely independent families
+-/
+
+/-- Extending an affinely independent family with a point outside its affine span preserves
+affine independence. -/
+lemma affineIndependent_option_extend
+    {ι : Type*} [Fintype ι] [DecidableEq ι] [Nonempty ι]
+    {f : ι → E} (hf : AffineIndependent ℝ f)
+    {p : E} (hp : p ∉ affineSpan ℝ (range f))
+    (f' : Option ι → E)
+    (h_some : ∀ i : ι, f' (some i) = f i)
+    (h_none : f' none = p) :
+    AffineIndependent ℝ f' := by
+  -- Show the subfamily excluding `none` is affinely independent
+  have h_sub : AffineIndependent ℝ (fun x : {y : Option ι // y ≠ none} => f' x) := by
+    -- The restricted function equals f composed with Option.get
+    have : (fun x : {y : Option ι // y ≠ none} => f' x) =
+           f ∘ (fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop)) := by
+      ext ⟨x, hx⟩
+      cases x with
+      | some i => exact h_some i
+      | none => exact absurd rfl hx
+
+    rw [this]
+
+    -- Construct the embedding {y : Option ι // y ≠ none} ↪ ι
+    let e : {y : Option ι // y ≠ none} ↪ ι :=
+      ⟨fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop),
+       fun ⟨x, hx⟩ ⟨y, hy⟩ h_eq => by
+         simp only [Subtype.mk.injEq]
+         cases x with
+         | some i =>
+           cases y with
+           | some j => simp_all
+           | none => exact absurd rfl hy
+         | none => exact absurd rfl hx⟩
+
+    exact hf.comp_embedding e
+
+  -- Show f' none ∉ affineSpan ℝ (f' '' {x | x ≠ none})
+  have h_not_mem : f' none ∉ affineSpan ℝ (f' '' {x : Option ι | x ≠ none}) := by
+    -- The image equals range f
+    have h_image_eq : f' '' {x : Option ι | x ≠ none} = range f := by
+      ext y
+      simp only [mem_image, Set.mem_setOf_eq, mem_range]
+      constructor
+      · intro ⟨x, hx_ne, hx_eq⟩
+        cases x with
+        | none => contradiction
+        | some i => use i; rw [← h_some]; exact hx_eq
+      · intro ⟨i, hi⟩
+        use some i
+        exact ⟨Option.some_ne_none i, h_some i ▸ hi⟩
+    rw [h_image_eq, h_none]
+    exact hp
+
+  -- Apply the main theorem
+  exact AffineIndependent.affineIndependent_of_notMem_span h_sub h_not_mem
+
+end General
+
+/-!
+## Finite-Dimensional Results
+
+These theorems require the affine space to be finite-dimensional.
+-/
+
+variable [FiniteDimensional ℝ E]
+
+section FiniteDimensional
+
+/-!
+### Affine dimension properties
+-/
+
+/-- Affine dimension is monotone: if `s ⊆ affineSpan ℝ t`, then `affineDim ℝ s ≤ affineDim ℝ t`. -/
+theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan ℝ t) :
+    affineDim ℝ s ≤ affineDim ℝ t := by
+  -- Use affineSpan_mono to get affineSpan ℝ s ≤ affineSpan ℝ (affineSpan ℝ t)
+  have h1 : affineSpan ℝ s ≤ affineSpan ℝ (affineSpan ℝ t) := affineSpan_mono ℝ h
+  -- Use idempotence: affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t
+  have h2 : affineSpan ℝ (affineSpan ℝ t) = affineSpan ℝ t := AffineSubspace.affineSpan_coe _
+  -- Combine to get affineSpan ℝ s ≤ affineSpan ℝ t
+  have h3 : affineSpan ℝ s ≤ affineSpan ℝ t := h2 ▸ h1
+  -- Apply direction_le to get direction ordering
+  have h4 : (affineSpan ℝ s).direction ≤ (affineSpan ℝ t).direction :=
+    AffineSubspace.direction_le h3
+  -- Use finrank monotonicity on submodules
+  -- affineDim is defined as Module.finrank of the direction
+  simp only [affineDim]
+  exact_mod_cast Submodule.finrank_mono h4
+
+/-!
+### Rockafellar's Theorem 1.6
+-/
 
 /-- Two affinely independent families with the same index type that both span the entire
 space can be mapped to each other by an affine automorphism. -/
@@ -332,63 +422,6 @@ theorem affineIndependent_indexed
       _ = (g i - g₀) + A f₀ + (g₀ - A f₀)   := by rw [h_basis_map]
       _ = g i                               := by abel
 
-omit [FiniteDimensional ℝ E] in
-/-- Extending an affinely independent family with a point outside its affine span preserves
-affine independence. -/
-lemma affineIndependent_option_extend
-    {ι : Type*} [Fintype ι] [DecidableEq ι] [Nonempty ι]
-    {f : ι → E} (hf : AffineIndependent ℝ f)
-    {p : E} (hp : p ∉ affineSpan ℝ (range f))
-    (f' : Option ι → E)
-    (h_some : ∀ i : ι, f' (some i) = f i)
-    (h_none : f' none = p) :
-    AffineIndependent ℝ f' := by
-  -- Show the subfamily excluding `none` is affinely independent
-  have h_sub : AffineIndependent ℝ (fun x : {y : Option ι // y ≠ none} => f' x) := by
-    -- The restricted function equals f composed with Option.get
-    have : (fun x : {y : Option ι // y ≠ none} => f' x) =
-           f ∘ (fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop)) := by
-      ext ⟨x, hx⟩
-      cases x with
-      | some i => exact h_some i
-      | none => exact absurd rfl hx
-
-    rw [this]
-
-    -- Construct the embedding {y : Option ι // y ≠ none} ↪ ι
-    let e : {y : Option ι // y ≠ none} ↪ ι :=
-      ⟨fun x => Option.get x.val (Option.ne_none_iff_isSome.mp x.prop),
-       fun ⟨x, hx⟩ ⟨y, hy⟩ h_eq => by
-         simp only [Subtype.mk.injEq]
-         cases x with
-         | some i =>
-           cases y with
-           | some j => simp_all
-           | none => exact absurd rfl hy
-         | none => exact absurd rfl hx⟩
-
-    exact hf.comp_embedding e
-
-  -- Show f' none ∉ affineSpan ℝ (f' '' {x | x ≠ none})
-  have h_not_mem : f' none ∉ affineSpan ℝ (f' '' {x : Option ι | x ≠ none}) := by
-    -- The image equals range f
-    have h_image_eq : f' '' {x : Option ι | x ≠ none} = range f := by
-      ext y
-      simp only [mem_image, Set.mem_setOf_eq, mem_range]
-      constructor
-      · intro ⟨x, hx_ne, hx_eq⟩
-        cases x with
-        | none => contradiction
-        | some i => use i; rw [← h_some]; exact hx_eq
-      · intro ⟨i, hi⟩
-        use some i
-        exact ⟨Option.some_ne_none i, h_some i ▸ hi⟩
-    rw [h_image_eq, h_none]
-    exact hp
-
-  -- Apply the main theorem
-  exact AffineIndependent.affineIndependent_of_notMem_span h_sub h_not_mem
-
 /-- **Rockafellar's Theorem 1.6**: Affinely independent families of the same size can be
 mapped to each other by an affine automorphism.
 
@@ -489,3 +522,5 @@ private theorem affineIndependent_to_affineIndependent_automorphism_aux
       use T
       intro i
       exact hT (some i)
+
+end FiniteDimensional
