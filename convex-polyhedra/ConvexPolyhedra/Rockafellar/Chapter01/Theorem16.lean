@@ -114,6 +114,55 @@ lemma exists_point_not_mem_of_affineSubspace_ne_top
 ### Rockafellar's Theorem 1.6
 -/
 
+set_option linter.unusedSectionVars false in
+/-- **Uniqueness of affine maps on spanning sets**: If two affine maps agree on a set that
+spans the entire space, then they are equal.
+
+This is a fundamental principle: affine maps are uniquely determined by their values on any
+spanning set. Affine independence is not required for uniqueness, only spanning. -/
+theorem AffineMap.eq_of_eq_on_spanning
+    {ι : Type*} [Fintype ι]
+    {P₁ P₂ : Type*} [NormedAddCommGroup P₁] [InnerProductSpace ℝ P₁]
+    [NormedAddCommGroup P₂] [InnerProductSpace ℝ P₂]
+    (p : ι → P₁)
+    (h_span : affineSpan ℝ (range p) = ⊤)
+    (f g : P₁ →ᵃ[ℝ] P₂)
+    (h_agree : ∀ i, f (p i) = g (p i)) :
+    f = g := by
+  -- Use AffineMap.ext: it suffices to show f and g agree on all points
+  ext x
+  -- Since p spans the entire space, x is in the affine span of range p
+  have hx : x ∈ affineSpan ℝ (range p) := by
+    rw [h_span]
+    exact AffineSubspace.mem_top ℝ P₁ x
+  -- By membership in affine span, x can be written as an affine combination
+  obtain ⟨w, hw_sum, hw_eq⟩ := eq_affineCombination_of_mem_affineSpan_of_fintype hx
+  -- Rewrite x using the affine combination
+  rw [hw_eq]
+  -- Both f and g preserve affine combinations
+  rw [Finset.map_affineCombination Finset.univ p w hw_sum f,
+      Finset.map_affineCombination Finset.univ p w hw_sum g]
+  -- The compositions f ∘ p and g ∘ p are equal
+  have : (f ∘ p : ι → P₂) = (g ∘ p : ι → P₂) := funext h_agree
+  rw [this]
+
+set_option linter.unusedSectionVars false in
+/-- **Uniqueness of affine automorphisms on spanning sets**: If two affine automorphisms
+agree on a set that spans the entire space, then they are equal.
+
+This specializes the general uniqueness principle to affine automorphisms. -/
+theorem AffineEquiv.eq_of_eq_on_spanning
+    {ι : Type*} [Fintype ι]
+    (p : ι → E)
+    (h_span : affineSpan ℝ (range p) = ⊤)
+    (T₁ T₂ : E ≃ᵃ[ℝ] E)
+    (h_agree : ∀ i, T₁ (p i) = T₂ (p i)) :
+    T₁ = T₂ := by
+  -- Use AffineEquiv.toAffineMap_inj: affine equivalences are equal iff their affine maps are equal
+  rw [← AffineEquiv.toAffineMap_inj]
+  -- Apply the general theorem for affine maps
+  exact AffineMap.eq_of_eq_on_spanning p h_span T₁.toAffineMap T₂.toAffineMap h_agree
+
 /-- Two affinely independent families with the same index type that both span the entire
 space can be mapped to each other by an affine automorphism. -/
 theorem affineIndependent_indexed
