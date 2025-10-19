@@ -414,7 +414,7 @@ there exists an affine automorphism `T : E ≃ᵃ[ℝ] E` such that `T (f i) = g
 -- Helper lemma for the induction
 theorem affineIndependent_to_affineIndependent_automorphism_aux
     (n : ℕ)
-    (ι : Type*) [Fintype ι] [DecidableEq ι] [Nonempty ι]
+    (ι : Type*) [Fintype ι] [DecidableEq ι]
     (f g : ι → E)
     (hf : AffineIndependent ℝ f)
     (hg : AffineIndependent ℝ g)
@@ -425,26 +425,39 @@ theorem affineIndependent_to_affineIndependent_automorphism_aux
   induction n generalizing ι f g with
   | zero =>
     -- Base case: n = 0, so card ι = finrank E + 1
-    -- This means both families span the entire space
-    have h_card_eq : Fintype.card ι = Module.finrank ℝ E + 1 := by
-      omega
+    -- Case split on whether ι is empty
+    by_cases h_empty : IsEmpty ι
+    · -- If ι is empty, the conclusion is vacuous
+      use AffineEquiv.refl ℝ E
+      intro i
+      exact IsEmpty.elim h_empty i
+    · -- If ι is nonempty, both families span the entire space
+      rw [not_isEmpty_iff] at h_empty
+      have h_card_eq : Fintype.card ι = Module.finrank ℝ E + 1 := by omega
 
-    -- By affineSpan_eq_top_iff_card_eq_finrank_add_one, this implies affineSpan = ⊤
-    have h_span_f : affineSpan ℝ (range f) = ⊤ := by
-      exact hf.affineSpan_eq_top_iff_card_eq_finrank_add_one.mpr h_card_eq
+      -- By affineSpan_eq_top_iff_card_eq_finrank_add_one, this implies affineSpan = ⊤
+      have h_span_f : affineSpan ℝ (range f) = ⊤ := by
+        exact hf.affineSpan_eq_top_iff_card_eq_finrank_add_one.mpr h_card_eq
 
-    have h_span_g : affineSpan ℝ (range g) = ⊤ := by
-      exact hg.affineSpan_eq_top_iff_card_eq_finrank_add_one.mpr h_card_eq
+      have h_span_g : affineSpan ℝ (range g) = ⊤ := by
+        exact hg.affineSpan_eq_top_iff_card_eq_finrank_add_one.mpr h_card_eq
 
-    -- Apply affineIndependent_indexed
-    exact affineIndependent_indexed f g hf hg h_span_f h_span_g
+      -- Apply affineIndependent_indexed
+      exact affineIndependent_indexed f g hf hg h_span_f h_span_g
 
   | succ n ih =>
     -- Inductive case: n > 0
+    -- Case split on whether ι is empty
+    by_cases h_empty : IsEmpty ι
+    · -- If ι is empty, the conclusion is vacuous
+      use AffineEquiv.refl ℝ E
+      intro i
+      exact IsEmpty.elim h_empty i
+    · -- If ι is nonempty, proceed with the inductive step
+      rw [not_isEmpty_iff] at h_empty
       -- This means card ι < finrank E + 1
       -- So the affine spans are proper subspaces
-      have h_card_lt : Fintype.card ι < Module.finrank ℝ E + 1 := by
-        omega
+      have h_card_lt : Fintype.card ι < Module.finrank ℝ E + 1 := by omega
 
       -- Since card < finrank + 1, the affine span cannot be the whole space
       have h_span_f_ne_top : affineSpan ℝ (range f) ≠ ⊤ := by
@@ -458,7 +471,6 @@ theorem affineIndependent_to_affineIndependent_automorphism_aux
         omega
 
       -- Find points outside the affine spans
-      -- Since affineSpan (range f) is a proper affine subspace, there exists a point not in it
       have h_exists_f : ∃ p_f : E, p_f ∉ affineSpan ℝ (range f) :=
         exists_point_not_mem_of_affineSubspace_ne_top _ h_span_f_ne_top
 
@@ -485,24 +497,18 @@ theorem affineIndependent_to_affineIndependent_automorphism_aux
       have hg' : AffineIndependent ℝ g' :=
         affineIndependent_option_extend hg hp_g g' (fun i => rfl) rfl
 
-      -- The dimension gap for Option ι is n - 1
+      -- The dimension gap for Option ι
       have h_card_option : Fintype.card (Option ι) = Fintype.card ι + 1 := by
         exact Fintype.card_option
 
-      -- The dimension gap for Option ι is exactly n (since we added 1 to the card)
-      have h_gap : n = Module.finrank ℝ E + 1 - Fintype.card (Option ι) := by
-        omega
+      have h_gap : n = Module.finrank ℝ E + 1 - Fintype.card (Option ι) := by omega
 
-      have h_card_option_bound : Fintype.card (Option ι) ≤ Module.finrank ℝ E + 1 := by
-        omega
+      have h_card_option_bound : Fintype.card (Option ι) ≤ Module.finrank ℝ E + 1 := by omega
 
       -- Apply IH to f' and g'
-      have h_ih := @ih (Option ι) _ _ _ f' g' hf' hg' h_gap h_card_option_bound
+      obtain ⟨T, hT⟩ := @ih (Option ι) _ _ f' g' hf' hg' h_gap h_card_option_bound
 
-      -- Extract the automorphism
-      obtain ⟨T, hT⟩ := h_ih
-
-      -- T already maps f i to g i for all i (because T (f' (some i)) = g' (some i))
+      -- T already maps f i to g i for all i
       use T
       intro i
       exact hT (some i)
