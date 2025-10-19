@@ -29,6 +29,8 @@ The file is organized into two sections:
 
 ### Finite-dimensional
 * `affineDim_le_of_subset_affineSpan`: Affine dimension is monotone with respect to affine span
+* `linearIndependent_card_eq_finrank_span_eq_top`: Linearly independent family with cardinality
+  equal to ambient dimension spans the entire space
 * `linearBasis_of_affineIndependent_spanning`: Construct linear basis from affinely independent
   spanning family via the difference map
 * `affineIndependent_indexed`: Two affinely independent families that span the entire space
@@ -241,6 +243,23 @@ theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan �
 ### Rockafellar's Theorem 1.6
 -/
 
+/-- A linearly independent family whose cardinality equals the ambient dimension
+spans the entire space. -/
+lemma linearIndependent_card_eq_finrank_span_eq_top
+    {ι : Type*} [Fintype ι]
+    {f : ι → E}
+    (h_indep : LinearIndependent ℝ f)
+    (h_card : Fintype.card ι = Module.finrank ℝ E) :
+    Submodule.span ℝ (range f) = ⊤ := by
+  -- Linear independence implies card = finrank(span)
+  have h_finrank_span : Fintype.card ι = (range f).finrank ℝ :=
+    linearIndependent_iff_card_eq_finrank_span.mp h_indep
+  -- Therefore finrank(span) = Module.finrank E
+  have h_span_full : (range f).finrank ℝ = Module.finrank ℝ E :=
+    h_finrank_span.symm.trans h_card
+  -- A submodule with full rank must be the whole space
+  exact Submodule.eq_top_of_finrank_eq h_span_full
+
 /-- Given an affinely independent family that spans the entire space, the differences from any
 base point form a linear basis of the ambient space.
 
@@ -267,26 +286,13 @@ lemma linearBasis_of_affineIndependent_spanning
     -- we have Fintype.card ι = Module.finrank ℝ E + 1
     have h_card_ι : Fintype.card ι = Module.finrank ℝ E + 1 :=
       hf.affineSpan_eq_top_iff_card_eq_finrank_add_one.mp hf_span
-
     -- The cardinality of {i // i ≠ i₀} is one less
     have h_card : Fintype.card {i // i ≠ i₀} = Module.finrank ℝ E := by
       have h_sub : Fintype.card {i // i ≠ i₀} = Fintype.card ι - 1 := Set.card_ne_eq i₀
       rw [h_sub, h_card_ι]
       omega
-
-    -- Linear independence implies card = finrank(span)
-    have h_finrank_span : Fintype.card {i // i ≠ i₀} = (range f_diff).finrank ℝ :=
-      linearIndependent_iff_card_eq_finrank_span.mp h_linear_indep
-
-    -- Therefore finrank(span) = Module.finrank E
-    have h_span_full : (range f_diff).finrank ℝ = Module.finrank ℝ E :=
-      h_finrank_span.symm.trans h_card
-
-    -- A submodule with full rank must be the whole space
-    have h_span_eq_top : Submodule.span ℝ (range f_diff) = ⊤ :=
-      Submodule.eq_top_of_finrank_eq h_span_full
-
-    exact h_span_eq_top.ge
+    -- Apply the helper: linearly independent with full cardinality spans
+    exact (linearIndependent_card_eq_finrank_span_eq_top h_linear_indep h_card).ge
 
   -- Construct the basis
   let B : Module.Basis {i // i ≠ i₀} ℝ E := Module.Basis.mk h_linear_indep h_span
