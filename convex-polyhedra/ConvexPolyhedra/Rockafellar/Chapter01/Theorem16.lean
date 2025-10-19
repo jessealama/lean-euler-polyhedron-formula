@@ -22,6 +22,8 @@ The file is organized into two sections:
 ## Main results
 
 ### General (any dimension)
+* `exists_point_not_mem_of_affineSubspace_ne_top`: A proper affine subspace does not contain
+  all points
 * `nonempty_of_affineSpan_eq_top`: If affine span equals the entire space, index type is nonempty
 * `AffineMap.eq_of_eq_on_spanning`: Affine maps uniquely determined by values on spanning sets
 * `AffineEquiv.eq_of_eq_on_spanning`: Affine automorphisms uniquely determined on spanning sets
@@ -33,6 +35,8 @@ The file is organized into two sections:
   equal to ambient dimension spans the entire space
 * `linearBasis_of_affineIndependent_spanning`: Construct linear basis from affinely independent
   spanning family via the difference map
+* `AffineIndependent.card_le_finrank_add_one`: Affinely independent families have cardinality
+  at most `finrank + 1`
 * `affineIndependent_indexed`: Two affinely independent families that span the entire space
   can be mapped by an affine automorphism (base case of Rockafellar's Theorem 1.6)
 * `affineIndependent_to_affineIndependent_automorphism`: Rockafellar's Theorem 1.6 -
