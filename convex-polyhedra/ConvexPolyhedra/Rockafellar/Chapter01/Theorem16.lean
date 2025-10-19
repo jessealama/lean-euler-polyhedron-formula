@@ -27,6 +27,7 @@ The file is organized into two sections:
 * `affineIndependent_option_extend`: Extending affinely independent families preserves independence
 
 ### Finite-dimensional
+* `affineDim_le_of_subset_affineSpan`: Affine dimension is monotone with respect to affine span
 * `affineIndependent_indexed`: Two affinely independent families that span the entire space
   can be mapped by an affine automorphism (Rockafellar's Theorem 1.6)
 
@@ -51,43 +52,6 @@ These theorems hold for affine spaces of any dimension (including infinite-dimen
 -/
 
 section General
-
-/-!
-### Translation invariance of affine dimension
--/
-
-/-- Translation preserves affine dimension: `affineDim ℝ (v +ᵥ s) = affineDim ℝ s`. -/
-theorem affineDim_vadd (v : E) (s : Set E) :
-    affineDim ℝ (v +ᵥ s) = affineDim ℝ s := by
-  -- affineSpan (v +ᵥ s) = v +ᵥ affineSpan s (by pointwise_vadd_span)
-  have h_span : affineSpan ℝ (v +ᵥ s) = v +ᵥ affineSpan ℝ s :=
-    (AffineSubspace.pointwise_vadd_span (k := ℝ) (V := E) (P := E) v s).symm
-  -- direction (v +ᵥ S) = S.direction for any affine subspace S
-  have h_dir : (v +ᵥ affineSpan ℝ s).direction = (affineSpan ℝ s).direction :=
-    AffineSubspace.pointwise_vadd_direction v (affineSpan ℝ s)
-  -- Combine: affineDim is the finrank of the direction
-  simp only [affineDim]
-  rw [h_span, h_dir]
-
-/-- Translation preserves affine dimension: `affineDim ℝ ((-v) +ᵥ s) = affineDim ℝ s`. -/
-theorem affineDim_neg_vadd (v : E) (s : Set E) :
-    affineDim ℝ ((-v) +ᵥ s) = affineDim ℝ s :=
-  affineDim_vadd (-v) s
-
-/-- Translation preserves affine dimension: `affineDim ℝ ((y ↦ y - v) '' s) = affineDim ℝ s`. -/
-theorem affineDim_image_sub (v : E) (s : Set E) :
-    affineDim ℝ ((fun y => y - v) '' s) = affineDim ℝ s := by
-  -- The image {y - v | y ∈ s} equals (-v) +ᵥ s
-  have h_eq : (fun y => y - v) '' s = (-v) +ᵥ s := by
-    ext x
-    simp only [mem_image, mem_vadd_set, sub_eq_add_neg]
-    constructor
-    · intro ⟨y, hy, h⟩
-      exact ⟨y, hy, by rw [add_comm] at h; exact h⟩
-    · intro ⟨y, hy, h⟩
-      exact ⟨y, hy, by rw [add_comm]; exact h⟩
-  rw [h_eq]
-  exact affineDim_neg_vadd v s
 
 /-!
 ### Helper lemmas for affine independence
