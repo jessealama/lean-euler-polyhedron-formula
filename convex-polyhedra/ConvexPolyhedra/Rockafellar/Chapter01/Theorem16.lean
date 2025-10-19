@@ -112,8 +112,8 @@ lemma exists_point_not_mem_of_affineSubspace_ne_top
 /-- **Uniqueness of affine maps on spanning sets**: If two affine maps agree on a set that
 spans the entire space, then they are equal.
 
-This is a fundamental principle: affine maps are uniquely determined by their values on any
-spanning set. Affine independence is not required for uniqueness, only spanning. -/
+Affine maps are uniquely determined by their values on any spanning set. Affine independence
+is not required for uniqueness, only spanning. -/
 theorem AffineMap.eq_of_eq_on_spanning
     {ι : Type*} [Fintype ι]
     {P₁ P₂ : Type*} [NormedAddCommGroup P₁] [InnerProductSpace ℝ P₁]
@@ -143,7 +143,7 @@ theorem AffineMap.eq_of_eq_on_spanning
 /-- **Uniqueness of affine automorphisms on spanning sets**: If two affine automorphisms
 agree on a set that spans the entire space, then they are equal.
 
-This specializes the general uniqueness principle to affine automorphisms. -/
+Specialization of `AffineMap.eq_of_eq_on_spanning` to affine automorphisms. -/
 theorem AffineEquiv.eq_of_eq_on_spanning
     {ι : Type*} [Fintype ι]
     (p : ι → E)
