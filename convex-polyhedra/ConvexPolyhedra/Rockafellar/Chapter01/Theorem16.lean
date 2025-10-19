@@ -22,6 +22,7 @@ The file is organized into two sections:
 ## Main results
 
 ### General (any dimension)
+* `nonempty_of_affineSpan_eq_top`: If affine span equals the entire space, index type is nonempty
 * `AffineMap.eq_of_eq_on_spanning`: Affine maps uniquely determined by values on spanning sets
 * `AffineEquiv.eq_of_eq_on_spanning`: Affine automorphisms uniquely determined on spanning sets
 * `affineIndependent_option_extend`: Extending affinely independent families preserves independence
@@ -68,6 +69,25 @@ lemma exists_point_not_mem_of_affineSubspace_ne_top
     exact h h_top
   -- Use the fact that a set ≠ univ iff there exists an element not in it
   exact (Set.ne_univ_iff_exists_notMem (S : Set E)).mp h_ne_univ
+
+/-- If the affine span of the range of a function equals the entire space, then the index type
+must be nonempty. -/
+lemma nonempty_of_affineSpan_eq_top {ι : Type*} (f : ι → E)
+    (h : affineSpan ℝ (range f) = ⊤) : Nonempty ι := by
+  -- Proof by contradiction
+  by_contra h_empty
+  -- Convert ¬Nonempty ι to IsEmpty ι
+  rw [not_nonempty_iff] at h_empty
+  -- If ι is empty, then range f is empty
+  have h_range_empty : range f = ∅ := range_eq_empty_iff.mpr h_empty
+  -- The affine span of the empty set is ⊥
+  have h_span_empty : affineSpan ℝ (range f) = ⊥ := by
+    rw [h_range_empty]
+    exact span_empty ℝ E E
+  -- But h says it equals ⊤
+  rw [h_span_empty] at h
+  -- This gives us ⊥ = ⊤, which contradicts bot_ne_top
+  exact absurd h (bot_ne_top (α := AffineSubspace ℝ E))
 
 /-!
 ### Uniqueness of affine maps on spanning sets
@@ -220,7 +240,7 @@ theorem affineDim_le_of_subset_affineSpan {s t : Set E} (h : s ⊆ affineSpan �
 /-- Two affinely independent families with the same index type that both span the entire
 space can be mapped to each other by an affine automorphism. -/
 theorem affineIndependent_indexed
-    {ι : Type*} [Fintype ι] [DecidableEq ι] [Nonempty ι]
+    {ι : Type*} [Fintype ι] [DecidableEq ι]
     (f g : ι → E)
     (hf : AffineIndependent ℝ f)
     (hg : AffineIndependent ℝ g)
@@ -234,8 +254,8 @@ theorem affineIndependent_indexed
   -- 4. Define affine map T x := A x + (g₀ - A f₀)
   -- This ensures T(f₀) = g₀ and T(f i) = g i for all i
 
-  -- Pick base points (using Nonempty ι)
-  let i₀ : ι := Classical.choice ‹Nonempty ι›
+  -- Pick base points (ι is nonempty since the span equals ⊤)
+  let i₀ : ι := Classical.choice (nonempty_of_affineSpan_eq_top f hf_span)
   let f₀ := f i₀
   let g₀ := g i₀
 
